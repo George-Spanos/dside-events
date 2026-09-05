@@ -32,7 +32,7 @@ func TestCreateEvent_Success(t *testing.T) {
 	}
 	assertNotContains(t, r, `name="link_url_6"`)
 	// max_tags is a server rule (see the validation table); every tag is offered.
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop", "other"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
 		assertContains(t, r, `value="`+tag+`"`)
 	}
 

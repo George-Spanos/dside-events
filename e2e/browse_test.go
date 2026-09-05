@@ -64,7 +64,7 @@ func TestFeed_TagFilter(t *testing.T) {
 
 	r = v.get("/")
 	assertStatus(t, r, 200)
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop", "other"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
 		assertContains(t, r, `href="/?tag=`+tag+`"`)
 	}
 

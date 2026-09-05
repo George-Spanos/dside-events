@@ -29,7 +29,7 @@ enum Role { user | poster }
 
 enum InterestState { interested | not_interested }
 
-enum Tag { concert | theater | film | exhibition | talk | party | dance | workshop | other }
+enum Tag { concert | theater | film | exhibition | talk | party | dance | workshop }
 
 ------------------------------------------------------------
 -- Entities and Variants
@@ -1004,7 +1004,9 @@ surface PwaAssets {
 -- Open Questions
 ------------------------------------------------------------
 
-open question "OQ-1 Tags: is the fixed MVP tag list exactly concert, theater, film, exhibition, talk, party, dance, workshop, other? (default: yes, this 9-tag set)"
+-- OQ-1 (tags) resolved by the founder on 2026-09-06: the fixed list is concert, theater,
+-- film, exhibition, talk, party, dance, workshop. No catch-all tag: better to miss a
+-- category than to have a bucket tag.
 open question "OQ-2 Event fields: title, start date+time, venue (required), price (optional text), plain-text description, 1-4 tags, up to 5 labelled http(s) links, no end time and no media? (default: yes)"
 open question "OQ-3 One post per event: is a duplicate defined as same poster + same normalised title + same Athens day, refused as already posted? (default: yes)"
 open question "OQ-4 Past start dates: may a poster create or edit an event that already started? (default: yes, within one year back and three years ahead, for backfill)"

@@ -1,7 +1,7 @@
 package main
 
 // tags is the fixed list of event tags, in display order.
-var tags = []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop", "other"}
+var tags = []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"}
 
 // validTag reports whether t is one of the fixed tags.
 func validTag(t string) bool {

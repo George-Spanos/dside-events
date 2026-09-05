@@ -19,7 +19,7 @@ func TestAccount_ShowsEmailRoleFollows(t *testing.T) {
 	assertForm(t, r, `action="/logout"`)
 	assertForm(t, r, `action="/account/delete"`, `name="confirm"`)
 	// Every tag can be followed from here.
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop", "other"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
 		assertForm(t, r, `action="/follow"`, `value="tag"`, `value="`+tag+`"`, `value="1"`)
 	}
 	assertNotContains(t, r, `href="/p/`+poster2.Slug+`"`)
