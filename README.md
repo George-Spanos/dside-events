@@ -70,8 +70,12 @@ Production (Watchtower-friendly): every push to `main` runs `make check` and
 publishes `ghcr.io/george-spanos/dside-events:latest` (plus a `:<sha>` tag) via
 `.github/workflows/build.yml` (secrets `CONTAINER_USERNAME`, `CONTAINER_PASSWORD`, `REPOSITORY_NAME` in the `prod` environment, same as planning-poker). On the server:
 
-    BASE_URL=https://events.example.com docker compose -f docker-compose.prod.yml up -d
-    docker compose -f docker-compose.prod.yml exec events /dside-events add-poster -name "You"
+    BASE_URL=https://events.example.com make prod-up
+    make prod-curators                        # creates the two curators, prints their secret links
+    make prod-poster-link SLUG=george-spanos  # replace a curator's link
+
+`prod-curators` is idempotent: the names live in the `CURATORS` variable of the
+Makefile; re-running prints `link (unchanged, …)` for curators that already exist.
 
 The service has `restart: always`, so
 Watchtower pulls the new image and restarts the container on its own.
