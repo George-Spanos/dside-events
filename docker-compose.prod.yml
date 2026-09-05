@@ -3,7 +3,7 @@ services:
   # events-data volume. Watchtower pulls a new :latest and restarts this.
   events:
     restart: always
-    image: ghcr.io/george-spanos/dside-events
+    image: ghcr.io/george-spanos/dside-events:latest
     ports:
       - 12349:8080
     environment:
