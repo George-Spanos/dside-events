@@ -789,7 +789,10 @@ surface AccountPage {
         -- only. Every state-changing request (any method other than GET or
         -- HEAD, on every surface) is refused when the browser's Sec-Fetch-Site
         -- header says cross-site; when that header is absent the Origin, else
-        -- the Referer, must name this host. No per-form token is used.
+        -- the Referer, must name this host when present. A request carrying
+        -- none of the three headers is accepted, and OPTIONS is exempt. No
+        -- per-form token is used. GET /k/{key} is the deliberate exception
+        -- (see SecretLink).
     @guidance
         -- HTTP: GET /account, 200 in two states. Without a session: "This
         -- device has no list yet. Press Interested on an event, or follow a
@@ -822,6 +825,10 @@ surface SecretLink {
         -- with "This link doesn't work. It may have been replaced with a new
         -- one." The link is the only way to reach an account from a second
         -- device and the only way posters log in.
+        -- This GET changes state on purpose: links arrive from chat or mail,
+        -- always cross-site, so it is the one deliberate exception to
+        -- CrossSiteWritesRejected. Opening someone else's link makes this
+        -- device theirs; that is the feature, not a leak (see OQ-18).
 }
 
 surface EventComposer {
@@ -922,3 +929,4 @@ open question "OQ-14 PWA icon: is a generated SVG/PNG icon the sole exception to
 open question "OQ-15 Packaging: single Go module dside.studio/events with SQLite as the only third-party dependency, deployed as a Docker image with a data volume? (default: yes)"
 open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their interest toggles)"
 open question "OQ-17 Abuse: should cookieless POSTs creating accounts be rate-limited or should idle accounts be purged? (default: no, POC)"
+open question "OQ-18 Key at rest: the secret key is stored in clear so the account page can show the link, which makes a copy of the database every login; acceptable for the POC, or should links be shown only once at creation and rotation with a hash at rest? (default: in clear, POC)"

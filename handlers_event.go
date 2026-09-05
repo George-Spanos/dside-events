@@ -129,6 +129,10 @@ func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if accountFrom(r) == nil && state == "clear" {
+		// Nothing to clear for a device without an account; don't start one.
+		return redirect(w, r, backOr(r, "/e/"+slug))
+	}
 	acct, err := s.ensureAccount(w, r)
 	if err != nil {
 		return err
@@ -165,6 +169,10 @@ func (s *Server) follow(w http.ResponseWriter, r *http.Request) error {
 		poster = p
 	default:
 		return errBadRequest
+	}
+	if accountFrom(r) == nil && on != "1" {
+		// Nothing to unfollow for a device without an account; don't start one.
+		return redirect(w, r, backOr(r, "/"))
 	}
 	acct, err := s.ensureAccount(w, r)
 	if err != nil {

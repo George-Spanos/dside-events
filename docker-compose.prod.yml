@@ -1,0 +1,18 @@
+services:
+  # One binary serves everything on one port; the SQLite file lives in the
+  # events-data volume. Watchtower pulls a new :latest and restarts this.
+  events:
+    restart: always
+    image: ghcr.io/george-spanos/dside-events
+    ports:
+      - 45002:8080
+    environment:
+      DB_PATH: /data/events.db
+      # Printed inside the curators' secret links, so it must be the public address.
+      BASE_URL: ${BASE_URL:-https://events.dside.studio}
+      SECURE_COOKIES: "true"
+    volumes:
+      - events-data:/data
+
+volumes:
+  events-data:
