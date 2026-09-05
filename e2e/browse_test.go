@@ -2,11 +2,10 @@ package e2e
 
 import (
 	"net/url"
-	"strings"
 	"testing"
 )
 
-// spec: PublicFeed, Event.is_upcoming
+// spec: Feed, Event.is_upcoming, Visitor
 func TestFeed_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
 	p := asPoster(t, poster1)
 	a := validEvent(t, tomorrow())
@@ -28,7 +27,7 @@ func TestFeed_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
 	assertBefore(t, r, a.Title, b.Title)
 }
 
-// spec: PublicFeed, EventDetail
+// spec: Feed, EventDetail
 func TestFeed_EventLinksToDetail(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
@@ -39,7 +38,7 @@ func TestFeed_EventLinksToDetail(t *testing.T) {
 	assertContains(t, r, `href="/e/`+slug+`"`)
 }
 
-// spec: PublicFeed
+// spec: Feed
 func TestFeed_TagFilter(t *testing.T) {
 	p := asPoster(t, poster1)
 	th := validEvent(t, tomorrow())
@@ -67,6 +66,8 @@ func TestFeed_TagFilter(t *testing.T) {
 	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
 		assertContains(t, r, `href="/?tag=`+tag+`"`)
 	}
+	// The following filter is always offered, session or not.
+	assertContains(t, r, `href="/following"`)
 
 	r = v.get("/?tag=bogus")
 	assertStatus(t, r, 404)
@@ -111,7 +112,7 @@ func TestEventDetail_Unknown404(t *testing.T) {
 	assertContains(t, r, "Page not found")
 }
 
-// spec: EventDetail, PublicFeed, Event.is_upcoming
+// spec: EventDetail, Feed, Event.is_upcoming
 func TestEventDetail_PastEventStillReachable(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, yesterday())
@@ -126,9 +127,12 @@ func TestEventDetail_PastEventStillReachable(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	assertContains(t, r, "This event has passed.")
+	// Past: no buttons for anyone.
+	assertNotContains(t, r, `value="interested"`)
+	assertNotContains(t, r, `value="not_interested"`)
 }
 
-// spec: PosterPage
+// spec: PosterPage, Poster
 func TestPosterPage_NameAndOwnEventsOnly(t *testing.T) {
 	p1 := asPoster(t, poster1)
 	p2 := asPoster(t, poster2)
@@ -150,8 +154,7 @@ func TestPosterPage_NameAndOwnEventsOnly(t *testing.T) {
 	assertNotContains(t, r, other.Title)
 	// Upcoming list first, then Past.
 	assertBefore(t, r, up.Title, past.Title)
-	// A visitor sees no follow control.
-	assertNoForm(t, r, `action="/follow"`)
+	assertNotContains(t, r, "@")
 }
 
 // spec: PosterPage
@@ -164,63 +167,84 @@ func TestPosterPage_Unknown404(t *testing.T) {
 	assertStatus(t, v.get("/p/"+slug), 404)
 }
 
-// spec: EventDetail, PosterPage, Login
-func TestAnon_NoFollowOrInterestControls(t *testing.T) {
+// spec: EventDetail, StartAccount, Visitor, MarkInterested, MarkNotInterested
+func TestAnon_EventPageOffersInterest_NoOwnerControls(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
+	page := "/e/" + slug
 
 	v := anon(t)
-	r := v.get("/e/" + slug)
+	r := v.get(page)
 	assertStatus(t, r, 200)
-	assertNotContains(t, r, `action="/e/`+slug+`/interest"`)
-	assertNotContains(t, r, `action="/follow"`)
+	// The buttons are there for everyone; pressing one starts the account.
+	assertForm(t, r, `action="`+page+`/interest"`, `value="interested"`)
+	assertForm(t, r, `action="`+page+`/interest"`, `value="not_interested"`)
+	assertContains(t, r, "Nobody yet interested")
+	assertNotContains(t, r, "Log in to mark interested")
+	if hasLinkToPath(r.Body, "/login") {
+		t.Errorf("anon event page still links to /login")
+	}
 	assertNotContains(t, r, `href="/e/`+slug+`/edit"`)
 	assertNotContains(t, r, `action="/e/`+slug+`/delete"`)
-	if !hasLoginLink(r.Body, "/e/"+slug) {
-		t.Errorf("anon event page lacks a link to /login?next=/e/%s\nbody: %s", slug, snippet(r.Body))
+	if v.cookie("session") != nil {
+		t.Fatalf("GET %s set a session cookie", page)
 	}
 
-	r = v.get("/p/" + poster1.Slug)
-	assertStatus(t, r, 200)
-	assertNotContains(t, r, `action="/follow"`)
-
-	r = v.get("/")
-	assertStatus(t, r, 200)
-	assertNotContains(t, r, `action="/follow"`)
+	// Anon and user see the same event page.
+	u := newUser(t)
+	ru := u.get(page)
+	assertStatus(t, ru, 200)
+	for _, frag := range []string{`value="interested"`, `value="not_interested"`, "Nobody yet interested"} {
+		if (hasForm(r.Body, frag) || containsFold(r.Body, frag)) != (hasForm(ru.Body, frag) || containsFold(ru.Body, frag)) {
+			t.Errorf("anon and user event pages differ on %q", frag)
+		}
+	}
 }
 
-// spec: Feed, MyEvents, AccountPage, EventComposer, EventEditor, Login
-func TestAnon_ProtectedRoutesRedirectToLogin(t *testing.T) {
-	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
+// spec: Feed, MyEvents, AccountPage, EventComposer, EventEditor, DeleteEvent, Poster, Visitor
+func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
+	f := validEvent(t, tomorrow())
+	slug := createEvent(t, asPoster(t, poster1), f)
 	v := anon(t)
 
-	for _, path := range []string{"/mine", "/account", "/new", "/following", "/e/" + slug + "/edit"} {
+	// Read pages: 200, no redirect, no cookie.
+	for _, path := range []string{"/mine", "/following", "/account"} {
 		r := v.get(path)
-		assertLoginRedirect(t, r, path)
+		assertStatus(t, r, 200)
+		if v.cookie("session") != nil || sessionSetCookie(r) != "" {
+			t.Errorf("GET %s set a session cookie for an anonymous visitor", path)
+		}
+	}
+	// Poster-only pages: 403 for anyone who is not a poster.
+	for _, path := range []string{"/new", "/e/" + slug + "/edit"} {
+		r := v.get(path)
+		assertStatus(t, r, 403)
 		if v.cookie("session") != nil {
 			t.Errorf("GET %s set a session cookie for an anonymous visitor", path)
 		}
 	}
 
+	hijack := validEvent(t, tomorrow())
 	posts := []struct {
 		path string
 		form url.Values
 	}{
-		{"/e/" + slug + "/interest", url.Values{"state": {"interested"}}},
-		{"/follow", url.Values{"kind": {"tag"}, "key": {"concert"}, "on": {"1"}}},
-		{"/account/delete", url.Values{"confirm": {"1"}}},
-		{"/logout", url.Values{}},
-		{"/new", validEvent(t, tomorrow()).values()},
-		{"/e/" + slug + "/edit", validEvent(t, tomorrow()).values()},
+		{"/new", hijack.values()},
+		{"/e/" + slug + "/edit", hijack.values()},
 		{"/e/" + slug + "/delete", url.Values{}},
 	}
 	for _, tc := range posts {
 		r := v.postForm(tc.path, tc.form)
-		if r.Status != 303 || !strings.HasPrefix(r.Location, "/login") {
-			t.Errorf("anon POST %s: got %d → %q, want 303 → /login…\nbody: %s", tc.path, r.Status, r.Location, snippet(r.Body))
+		if r.Status != 403 {
+			t.Errorf("anon POST %s: got %d → %q, want 403\nbody: %s", tc.path, r.Status, r.Location, snippet(r.Body))
+		}
+		if v.cookie("session") != nil {
+			t.Errorf("anon POST %s started an account", tc.path)
 		}
 	}
 	// Nothing leaked through: the event is untouched and still public.
 	r := v.get("/e/" + slug)
 	assertStatus(t, r, 200)
+	assertContains(t, r, f.Title)
 	assertContains(t, r, "Nobody yet interested")
+	assertNotContains(t, anon(t).get("/"), hijack.Title)
 }

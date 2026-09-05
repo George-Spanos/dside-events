@@ -7,23 +7,47 @@ HTML. Product spec: `PROJECT.md`.
 
 Everything goes through `make` (`make help` lists the targets):
 
-    make run                                  # dev server on 127.0.0.1:8080, codes in otp.log
-    make poster EMAIL=you@example.com NAME="You"
+    make run                                  # dev server on 127.0.0.1:8080
+    make poster NAME="Maria P." [SLUG=maria]  # a curator; prints their secret link
+    make poster-link SLUG=maria               # a new link for an existing curator
     make check                                # fmt + vet + unit tests + e2e
 
 Without make:
 
-    ADDR=127.0.0.1:8080 DEV_OTP_FILE=/tmp/otp.log go run . serve
+    ADDR=127.0.0.1:8080 go run . serve
 
 Prints exactly one line to stdout (`listening on http://127.0.0.1:8080`) and
-logs to stderr. Open the URL, log in with any email; the six-digit code is
-appended to `/tmp/otp.log` as `<RFC3339>\t<email>\t<code>`.
+logs to stderr.
 
-Make someone a curator (works while the server runs):
+## Accounts
 
-    go run . add-poster -email maria@example.com -name "Maria P." [-slug maria-p]
+There is no sign-up and no email. Everyone browses; the first press of
+Interested or Follow creates an anonymous account and keeps it in a cookie
+(`session`, HttpOnly, SameSite=Lax, 365 days). The account page shows a
+**secret link** (`/k/<key>`): opening it on another device continues the same
+account there, and opening it while another account's cookie is present
+switches to the link's account. "Get a new link" replaces the key (the old
+link stops working; devices already using the account stay in). "Forget this
+device" drops the cookie only; the link still opens the account. "Delete
+account" removes the account, its interests, follows and sessions.
 
-Idempotent; promotes an existing user account. Prints `poster <slug> <email>`.
+Curators (posters) are created by hand and log in with the same kind of link:
+
+    go run . add-poster -name "Maria P." [-slug maria]
+
+prints two lines, `poster <slug>` and `link <BASE_URL>/k/<key>`. Send the link
+to the curator; opening it logs them in and lands on `/mine`. Re-running for a
+slug that already exists changes nothing and prints `poster <slug>` followed by
+`link (unchanged, run poster-link to get a new one)`. To replace a curator's
+link (lost, leaked, or never received):
+
+    go run . poster-link -slug maria
+
+prints `link <BASE_URL>/k/<key>`; an unknown slug exits 1. Both commands work
+while the server runs (SQLite WAL) and need the same `DB_PATH` and `BASE_URL`.
+
+Keys are 32 random bytes (base64url, 43 characters) stored as-is in the
+database, which is the trust boundary; sessions are stored hashed as before.
 
 ## Configuration (environment)
 
@@ -31,29 +55,25 @@ Idempotent; promotes an existing user account. Prints `poster <slug> <email>`.
 |---|---|---|
 | `ADDR` | `:8080` | listen address (`127.0.0.1:0` picks a free port) |
 | `DB_PATH` | `events.db` | SQLite file (WAL mode) |
-| `BASE_URL` | `http://localhost:8080` | public URL |
+| `BASE_URL` | `http://localhost:8080` | public URL; secret links are built from it. `serve` without it uses the address it actually listens on (so `ADDR=127.0.0.1:0` still prints working links); the CLI uses the default |
 | `SECURE_COOKIES` | `false` | set `true` behind HTTPS |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | — | when `SMTP_HOST` is set, codes go out by email (port 587 default) |
-| `DEV_OTP_FILE` | — | when SMTP is off, append codes to this file |
-| `OTP_TTL` | `10m` | code lifetime (Go duration) |
-| `OTP_MAX_ATTEMPTS` | `5` | wrong guesses before a code is void |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Docker
 
     docker compose up --build
-    docker compose exec events /dside-events add-poster -email you@example.com -name "You"
+    docker compose exec events /dside-events add-poster -name "You"
 
 The SQLite database lives in the `events-data` volume at `/data/events.db`.
+Set `BASE_URL` in `compose.yaml` to the public address so printed links work.
 
 ## Layout
 
-    main.go config.go server.go errors.go templates.go auth.go   wiring, routing, middleware
+    main.go config.go server.go errors.go templates.go auth.go   wiring, routing, middleware, sessions
     handlers_*.go event_form.go slug.go tags.go                 HTTP handlers, validation
     templates/                                                  html/template pages
     static/                                                     style.css app.js sw.js manifest icon
     internal/store                                              SQLite (modernc.org/sqlite), migrations
-    internal/mail                                               login-code delivery (dev file / SMTP)
     e2e/                                                        black-box HTTP suite (`go test ./e2e/...`)
 
 ## Tests
@@ -64,6 +84,9 @@ The SQLite database lives in the `events-data` volume at `/data/events.db`.
 ## Conventions
 
 - Every form works without JavaScript: success → 303, validation failure → 422
-  with the submitted values, anonymous → 303 `/login?next=…`, wrong role → 403.
+  with the submitted values, wrong role (including no account) → 403.
+- Interested and Follow never need a prior login: without a session they create
+  the account first, then act. Read pages never redirect; without a session
+  `/mine`, `/following` and `/account` show an empty state.
 - Times are stored as unix seconds (UTC) and shown in Europe/Athens.
 - Event URLs never change after publishing.

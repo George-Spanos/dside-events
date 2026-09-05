@@ -6,9 +6,6 @@ services:
     environment:
       BASE_URL: http://localhost:8080
       SECURE_COOKIES: "false"
-      # Development only: login codes are appended here instead of being emailed.
-      DEV_OTP_FILE: /data/otp.log
-      # Production: set SMTP_HOST (and SMTP_PORT/USER/PASS/FROM) and drop DEV_OTP_FILE.
     volumes:
       - events-data:/data
     restart: unless-stopped

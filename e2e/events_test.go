@@ -11,14 +11,14 @@ var slugShape = regexp.MustCompile(`^[a-z0-9-]+-\d{4}-\d{2}-\d{2}(-\d+)?$`)
 
 // spec: CreateEvent, EventComposer, Poster, Event.PostedByPoster
 func TestNewEvent_UserForbidden(t *testing.T) {
-	u := loginAs(t, uniqEmail(t, "alice"))
+	u := newUser(t)
 	assertStatus(t, u.get("/new"), 403)
 	f := validEvent(t, tomorrow())
 	assertStatus(t, u.postForm("/new", f.values()), 403)
 	assertNotContains(t, anon(t).get("/"), f.Title)
 }
 
-// spec: CreateEvent, EventComposer, EventDetail, PublicFeed, PosterPage
+// spec: CreateEvent, Event, EventComposer, EventDetail, Feed, PosterPage
 func TestCreateEvent_Success(t *testing.T) {
 	p := asPoster(t, poster1)
 	r := p.get("/new")
@@ -200,7 +200,7 @@ func TestCreateEvent_GreekTitleSlug(t *testing.T) {
 	assertContains(t, r, f.Title)
 }
 
-// spec: EditEvent, EventEditor, EventDetail, PublicFeed
+// spec: EditEvent, EventEditor, EventDetail, Feed
 func TestEditEvent_OwnerEdits_SlugImmutable(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
@@ -290,7 +290,7 @@ func TestEditEvent_OtherPosterForbidden(t *testing.T) {
 // spec: EditEvent, EventEditor
 func TestEditEvent_UserForbidden(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	u := loginAs(t, uniqEmail(t, "alice"))
+	u := newUser(t)
 	assertStatus(t, u.get("/e/"+slug+"/edit"), 403)
 	assertStatus(t, u.postForm("/e/"+slug+"/edit", validEvent(t, tomorrow()).values()), 403)
 }
@@ -307,7 +307,7 @@ func TestDeleteEvent_OwnerDeletes_CascadesInterest(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, p, f)
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	assertRedirect(t, setInterest(alice, slug, "interested", "/e/"+slug), "/e/"+slug)
 	assertContains(t, alice.get("/mine"), f.Title)
 
@@ -332,14 +332,14 @@ func TestDeleteEvent_OtherPosterOrUserForbidden(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	assertStatus(t, asPoster(t, poster2).postForm("/e/"+slug+"/delete", nil), 403)
-	assertStatus(t, loginAs(t, uniqEmail(t, "alice")).postForm("/e/"+slug+"/delete", nil), 403)
+	assertStatus(t, newUser(t).postForm("/e/"+slug+"/delete", nil), 403)
 	assertStatus(t, asPoster(t, poster1).postForm("/e/no-such-event-2030-01-01/delete", nil), 404)
 	r := anon(t).get("/e/" + slug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 }
 
-// spec: EventDetailForUser, EventEditor
+// spec: EventDetail, EventEditor
 func TestEventDetail_EditDeleteOnlyForOwner(t *testing.T) {
 	p := asPoster(t, poster1)
 	slug := createEvent(t, p, validEvent(t, tomorrow()))
@@ -352,7 +352,7 @@ func TestEventDetail_EditDeleteOnlyForOwner(t *testing.T) {
 
 	for name, c := range map[string]*client{
 		"other poster": asPoster(t, poster2),
-		"user":         loginAs(t, uniqEmail(t, "alice")),
+		"user":         newUser(t),
 		"anon":         anon(t),
 	} {
 		r := c.get("/e/" + slug)
@@ -363,41 +363,67 @@ func TestEventDetail_EditDeleteOnlyForOwner(t *testing.T) {
 	}
 }
 
-// spec: AddPoster, PromoteToPoster, PosterSlugsUnique, PosterPage
-func TestAddPoster_CLI_PromotesAndIdempotent(t *testing.T) {
-	email := uniqEmail(t, "carol")
-	c := loginAs(t, email)
-	assertStatus(t, c.get("/new"), 403)
-	assertRedirect(t, follow(c, "tag", "film", "1", "/account"), "/account")
+// spec: AddPoster, PosterSlugsUnique, PosterPage, OpenSecretLink, EventComposer, Poster, Account
+func TestAddPoster_CLI_PrintsLink_NoOpForExistingSlug(t *testing.T) {
+	s := startServer(t)
 
-	// Promote while the server is running; the existing session sees it at once.
-	p := addPoster(t, shared, email, "Carol C.")
-	if p.Slug == "" {
-		t.Fatalf("empty slug from add-poster")
+	// A new poster: slug + link, the link logs in, the curator page exists.
+	slug := uniqSlug("carol")
+	p := addPoster(t, s, "Carol C.", slug)
+	if p.Slug != slug {
+		t.Errorf("add-poster -slug %s printed slug %q", slug, p.Slug)
 	}
-	assertStatus(t, c.get("/new"), 200)
-	r := anon(t).get("/p/" + p.Slug)
+	if !strings.HasPrefix(p.Link, s.url+"/k/") {
+		t.Errorf("link %q does not start with BASE_URL %s/k/", p.Link, s.url)
+	}
+	if len(p.Key) != 43 {
+		t.Errorf("key %q has length %d, want 43", p.Key, len(p.Key))
+	}
+	r := newClient(t, s).get("/p/" + p.Slug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, "Carol C.")
-	// Follows survive the promotion.
-	assertForm(t, c.get("/account"), `action="/follow"`, `value="tag"`, `value="film"`, `value="0"`)
+	c := openLink(t, s, p.Link)
+	assertStatus(t, c.get("/new"), 200)
+	createEvent(t, c, validEvent(t, tomorrow()))
 
-	// Idempotent: same email → same slug.
-	again := addPoster(t, shared, email, "Carol C.")
-	if again.Slug != p.Slug {
-		t.Errorf("second add-poster slug %q, want %q", again.Slug, p.Slug)
+	// Re-running for the same slug is a no-op: same poster line, no new link,
+	// the old link still works and the name is not changed.
+	out := addPosterRaw(t, s, "Somebody Else", slug)
+	if m := posterLine.FindStringSubmatch(out); m == nil || m[1] != slug {
+		t.Errorf("no-op add-poster printed %q, want 'poster %s'", strings.TrimSpace(out), slug)
+	}
+	if !strings.Contains(out, linkUnchanged) {
+		t.Errorf("no-op add-poster stdout lacks %q:\n%s", linkUnchanged, out)
+	}
+	if linkKey.MatchString(out) {
+		t.Errorf("no-op add-poster printed a key:\n%s", out)
+	}
+	assertStatus(t, openLink(t, s, p.Link).get("/new"), 200)
+	r = newClient(t, s).get("/p/" + slug)
+	assertStatus(t, r, 200)
+	assertContains(t, r, "Carol C.")
+	assertNotContains(t, r, "Somebody Else")
+
+	// Without -slug the slug derives from the name; the same name a second
+	// time hits the existing slug and is the same no-op.
+	d := addPoster(t, s, "Dave D.", "")
+	if d.Slug == "" || d.Slug == slug {
+		t.Fatalf("add-poster without -slug gave slug %q", d.Slug)
+	}
+	if !strings.HasPrefix(d.Slug, "dave") {
+		t.Errorf("slug %q for \"Dave D.\" does not start with dave", d.Slug)
+	}
+	assertStatus(t, openLink(t, s, d.Link).get("/new"), 200)
+	out = addPosterRaw(t, s, "Dave D.", "")
+	if !strings.Contains(out, linkUnchanged) {
+		t.Errorf("second add-poster for the same name printed:\n%s", out)
 	}
 
-	// A brand-new poster: creates the account, can post immediately.
-	fresh := addPoster(t, shared, uniqEmail(t, "dave"), "Dave D.")
-	assertStatus(t, anon(t).get("/p/"+fresh.Slug), 200)
-	d := loginAs(t, fresh.Email)
-	createEvent(t, d, validEvent(t, tomorrow()))
-
-	// Slugs stay unique even when names collide.
-	twin := addPoster(t, shared, uniqEmail(t, "twin"), poster1.Name)
-	if twin.Slug == poster1.Slug {
-		t.Errorf("two posters named %q share slug %q", poster1.Name, twin.Slug)
+	// Two posters never share a slug or a key; an explicit different slug
+	// for the same name is a different poster.
+	e := addPoster(t, s, "Dave D.", uniqSlug("dave"))
+	if e.Slug == d.Slug || e.Key == d.Key {
+		t.Errorf("posters %q and %q share slug or key", d.Slug, e.Slug)
 	}
-	assertStatus(t, anon(t).get("/p/"+twin.Slug), 200)
+	assertStatus(t, newClient(t, s).get("/p/"+e.Slug), 200)
 }

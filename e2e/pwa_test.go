@@ -64,17 +64,19 @@ func TestServiceWorker_ContentType(t *testing.T) {
 // spec: PwaAssets
 func TestPages_DeclareManifestViewportAndSW(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	u := loginAs(t, uniqEmail(t, "alice"))
+	u := newUser(t)
 	pages := []struct {
 		name string
 		r    resp
 	}{
 		{"/", anon(t).get("/")},
-		{"/login", anon(t).get("/login")},
+		{"/following", anon(t).get("/following")},
 		{"/e/{slug}", anon(t).get("/e/" + slug)},
 		{"/p/{slug}", anon(t).get("/p/" + poster1.Slug)},
 		{"/mine", u.get("/mine")},
+		{"/mine (anon)", anon(t).get("/mine")},
 		{"/account", u.get("/account")},
+		{"/account (anon)", anon(t).get("/account")},
 		{"/offline", anon(t).get("/offline")},
 		{"404", anon(t).get("/definitely-not-here")},
 	}
@@ -159,11 +161,11 @@ func TestNotFound_CustomPage(t *testing.T) {
 	}
 }
 
-// spec: PwaAssets, Logout
+// spec: PwaAssets, ForgetDevice, RotateSecretLink
 func TestMethodNotAllowed(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	u := loginAs(t, uniqEmail(t, "alice"))
-	for _, p := range []string{"/logout", "/follow", "/account/delete", "/e/" + slug + "/interest", "/e/" + slug + "/delete"} {
+	u := newUser(t)
+	for _, p := range []string{"/follow", "/account/delete", "/account/key", "/forget", "/e/" + slug + "/interest", "/e/" + slug + "/delete"} {
 		r := u.get(p)
 		if r.Status != 405 {
 			t.Errorf("GET %s: status %d, want 405", p, r.Status)
@@ -174,10 +176,9 @@ func TestMethodNotAllowed(t *testing.T) {
 	assertStatus(t, anon(t).get("/e/"+slug), 200)
 }
 
-// spec: PwaAssets, Login, CreateEvent, EditEvent, DeleteEvent, MarkInterested, FollowTag, DeleteAccount, Logout
+// spec: PwaAssets, StartAccount, CreateEvent, EditEvent, DeleteEvent, MarkInterested, FollowTag, RotateSecretLink, ForgetDevice, DeleteAccount, OpenSecretLink
 func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
-	email := uniqEmail(t, "alice")
-	u := anon(t)
+	u := anon(t) // its first POST below starts the account
 	p := asPoster(t, poster1)
 	var slug string
 	f := validEvent(t, tomorrow())
@@ -186,8 +187,6 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 		route string
 		run   func() resp
 	}{
-		{"POST /login", func() resp { return requestCode(u, email, "") }},
-		{"POST /login/code", func() resp { return verifyCode(u, readOTP(t, shared, email), "") }},
 		{"POST /new", func() resp {
 			r := p.postForm("/new", f.values())
 			slug = strings.TrimPrefix(r.Location, "/e/")
@@ -200,12 +199,16 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 		}},
 		{"POST /e/{slug}/interest", func() resp { return setInterest(u, slug, "interested", "/e/"+slug) }},
 		{"POST /follow", func() resp { return follow(u, "tag", "concert", "1", "/account") }},
+		{"POST /account/key", func() resp { return u.postForm("/account/key", nil) }},
 		{"POST /e/{slug}/delete", func() resp { return p.postForm("/e/"+slug+"/delete", nil) }},
-		{"POST /account/delete", func() resp { return u.postForm("/account/delete", url.Values{"confirm": {"1"}}) }},
-		{"POST /logout", func() resp {
-			// Log a throwaway user out rather than the shared poster session.
-			return loginAs(t, uniqEmail(t, "bye")).postForm("/logout", nil)
+		{"POST /forget", func() resp {
+			// Forget a throwaway device rather than u, which still has to delete itself.
+			return newUser(t).postForm("/forget", nil)
 		}},
+		{"POST /account/delete", func() resp { return u.postForm("/account/delete", url.Values{"confirm": {"1"}}) }},
+		// The secret link is the one state-changing GET (it creates a session):
+		// a plain <a href> a browser follows, so it redirects the same way.
+		{"GET /k/{key}", func() resp { return anon(t).get(keyPath(poster2.Link)) }},
 	}
 	for _, s := range steps {
 		r := s.run()
@@ -221,23 +224,19 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 	}
 }
 
-// spec: PwaAssets, Login, EventDetailForUser, EventComposer, EventEditor, AccountPage, MyEvents, PosterPageForUser, Feed
+// spec: PwaAssets, EventDetail, EventComposer, EventEditor, AccountPage, MyEvents, PosterPage, Feed, SecretLink
 func TestNoJS_FormsAreWellFormed(t *testing.T) {
 	p := asPoster(t, poster1)
 	slug := createEvent(t, p, validEvent(t, tomorrow()))
 	hidden := createEvent(t, p, validEvent(t, tomorrow()))
-	u := loginAs(t, uniqEmail(t, "alice"))
+	u := newUser(t)
 	assertRedirect(t, setInterest(u, hidden, "not_interested", "/mine"), "/mine")
-
-	otp := anon(t)
-	assertRedirectPath(t, requestCode(otp, uniqEmail(t, "code"), ""), "/login/code")
 
 	pages := []struct {
 		name string
 		r    resp
 	}{
-		{"/login", anon(t).get("/login")},
-		{"/login/code", otp.get("/login/code")},
+		{"/e/{slug} (anon)", anon(t).get("/e/" + slug)},
 		{"/e/{slug} (user)", u.get("/e/" + slug)},
 		{"/e/{slug} (owner)", p.get("/e/" + slug)},
 		{"/e/{slug} (hidden)", u.get("/e/" + hidden)},
@@ -246,6 +245,7 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 		{"/account (user)", u.get("/account")},
 		{"/account (poster)", p.get("/account")},
 		{"/mine", u.get("/mine")},
+		{"/p/{slug} (anon)", anon(t).get("/p/" + poster1.Slug)},
 		{"/p/{slug} (user)", u.get("/p/" + poster1.Slug)},
 		{"/?tag=concert (user)", u.get("/?tag=concert")},
 	}
@@ -265,5 +265,10 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 				t.Errorf("%s: form without a local action: %s", pg.name, tag)
 			}
 		}
+	}
+	// The secret link on /account is a plain anchor, not a form or script.
+	r := u.get("/account")
+	if !secretLinkHref.MatchString(r.Body) {
+		t.Errorf("/account has no <a href=…/k/{key}> secret link")
 	}
 }

@@ -1,23 +1,16 @@
 -- 001_init: full schema for dside-events. Timestamps are unix seconds UTC.
+--
+-- Accounts are anonymous. `key` is the account's only credential (the
+-- "secret link"): 32 random bytes, base64url. Posters additionally carry a
+-- public name and slug.
 CREATE TABLE accounts (
   id         INTEGER PRIMARY KEY,
-  email      TEXT NOT NULL UNIQUE,
   role       TEXT NOT NULL CHECK (role IN ('user', 'poster')),
   name       TEXT NOT NULL DEFAULT '',
   slug       TEXT UNIQUE,
+  key        TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL
 );
-
-CREATE TABLE otp_codes (
-  id          INTEGER PRIMARY KEY,
-  email       TEXT NOT NULL,
-  code_hash   TEXT NOT NULL,
-  attempts    INTEGER NOT NULL DEFAULT 0,
-  expires_at  INTEGER NOT NULL,
-  created_at  INTEGER NOT NULL,
-  consumed_at INTEGER
-);
-CREATE INDEX otp_codes_email_created ON otp_codes(email, created_at);
 
 CREATE TABLE sessions (
   token_hash TEXT PRIMARY KEY,

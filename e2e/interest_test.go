@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// spec: MarkInterested, EventDetail, EventDetailForUser, MyEvents, PublicFeed
+// spec: MarkInterested, EventDetail, EventDetail, MyEvents, Feed
 func TestInterested_CounterPublic_AppearsInMine(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
@@ -17,7 +17,7 @@ func TestInterested_CounterPublic_AppearsInMine(t *testing.T) {
 		t.Fatalf("fresh event counter = %d, want 0", n)
 	}
 
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	r := alice.get(page)
 	assertStatus(t, r, 200)
 	assertForm(t, r, `action="`+page+`/interest"`, `value="interested"`)
@@ -60,7 +60,7 @@ func TestInterested_CounterPublic_AppearsInMine(t *testing.T) {
 func TestInterested_IdempotentPerUser(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	for i := 0; i < 3; i++ {
 		assertRedirect(t, setInterest(alice, slug, "interested", page), page)
 	}
@@ -73,8 +73,8 @@ func TestInterested_IdempotentPerUser(t *testing.T) {
 func TestInterested_TwoUsersCountTwo(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
-	alice := loginAs(t, uniqEmail(t, "alice"))
-	bob := loginAs(t, uniqEmail(t, "bob"))
+	alice := newUser(t)
+	bob := newUser(t)
 	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
 	assertRedirect(t, setInterest(bob, slug, "interested", page), page)
 	r := anon(t).get(page)
@@ -88,14 +88,14 @@ func TestInterested_TwoUsersCountTwo(t *testing.T) {
 	}
 }
 
-// spec: MarkNotInterested, Feed, EventDetailForUser
+// spec: MarkNotInterested, Feed, EventDetail
 func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	f.Tags = []string{"exhibition"}
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
-	alice := loginAs(t, uniqEmail(t, "alice"))
-	bob := loginAs(t, uniqEmail(t, "bob"))
+	alice := newUser(t)
+	bob := newUser(t)
 	assertRedirect(t, follow(alice, "tag", "exhibition", "1", "/following"), "/following")
 	assertContains(t, alice.get("/"), f.Title)
 	assertContains(t, alice.get("/following"), f.Title)
@@ -135,7 +135,7 @@ func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 func TestNotInterested_NotInMineUpcoming_ButInHidden(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	assertRedirect(t, setInterest(alice, slug, "not_interested", "/mine"), "/mine")
 
 	r := alice.get("/mine")
@@ -158,7 +158,7 @@ func TestInterest_SwitchInterestedToNotInterested(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	v := anon(t)
 
 	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
@@ -189,7 +189,7 @@ func TestInterest_Clear_RestoresDefault(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	v := anon(t)
 
 	// not_interested → clear: back in the feed, gone from /mine.
@@ -218,7 +218,7 @@ func TestInterest_Clear_RestoresDefault(t *testing.T) {
 // spec: ClearInterest, MarkInterested
 func TestInterest_BadStateOrUnknownEvent(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 	assertStatus(t, setInterest(alice, slug, "maybe", ""), 400)
 	assertStatus(t, setInterest(alice, slug, "", ""), 400)
 	assertStatus(t, alice.postForm("/e/"+slug+"/interest", url.Values{"back": {"/"}}), 400)
@@ -228,7 +228,7 @@ func TestInterest_BadStateOrUnknownEvent(t *testing.T) {
 	}
 }
 
-// spec: MyEvents, EventDetailForUser, Event.is_upcoming
+// spec: MyEvents, EventDetail, Event.is_upcoming
 func TestMine_UpcomingVsPast(t *testing.T) {
 	p := asPoster(t, poster1)
 	up := validEvent(t, tomorrow())
@@ -237,7 +237,7 @@ func TestMine_UpcomingVsPast(t *testing.T) {
 	past.Title = uniqTitle(t, "Gone")
 	upSlug := createEvent(t, p, up)
 	pastSlug := createEvent(t, p, past)
-	alice := loginAs(t, uniqEmail(t, "alice"))
+	alice := newUser(t)
 
 	// A past event shows no toggles but still accepts the plain post.
 	r := alice.get("/e/" + pastSlug)
@@ -271,10 +271,45 @@ func TestMine_UpcomingVsPast(t *testing.T) {
 func TestMine_Empty(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	createEvent(t, asPoster(t, poster1), f)
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	r := c.get("/mine")
 	assertStatus(t, r, 200)
 	assertNotContains(t, r, f.Title)
 	assertNotContains(t, r, `href="/e/`)
 	assertContains(t, r, `href="/`)
+}
+
+// spec: MarkInterested, StartAccount, EventDetail, MyEvents, Interest, Visitor
+func TestInterested_AnonMarkStartsAccount(t *testing.T) {
+	f := validEvent(t, tomorrow())
+	slug := createEvent(t, asPoster(t, poster1), f)
+	page := "/e/" + slug
+
+	v := anon(t)
+	r := setInterest(v, slug, "interested", "/mine")
+	assertRedirect(t, r, "/mine")
+	if v.cookie("session") == nil {
+		t.Fatalf("anonymous Interested did not set a session cookie")
+	}
+	r = v.follow(r)
+	assertStatus(t, r, 200)
+	assertContains(t, r, f.Title)
+	r = v.get(page)
+	assertStatus(t, r, 200)
+	if n := interestedCount(t, r.Body); n != 1 {
+		t.Errorf("counter = %d, want 1", n)
+	}
+	// Not interested from a fresh visitor works the same way and hides the
+	// event from that visitor's feed only.
+	w := anon(t)
+	assertRedirect(t, setInterest(w, slug, "not_interested", page), page)
+	if w.cookie("session") == nil {
+		t.Fatalf("anonymous Not interested did not set a session cookie")
+	}
+	assertNotContains(t, w.get("/"), f.Title)
+	assertContains(t, w.get(page), "Hidden from your feed")
+	assertContains(t, anon(t).get("/"), f.Title)
+	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+		t.Errorf("counter after a not_interested = %d, want 1", n)
+	}
 }

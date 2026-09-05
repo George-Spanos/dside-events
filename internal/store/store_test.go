@@ -27,36 +27,14 @@ func openTest(t *testing.T) *Store {
 func TestEventsAndInterests(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
-	poster, err := s.UpsertPoster(ctx, "p@example.com", "Maria P.", "maria-p")
+	poster, _, err := s.CreatePoster(ctx, "Maria P.", "maria-p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := s.UpsertPoster(ctx, "p@example.com", "Maria P.", "maria-p")
-	if err != nil || again.ID != poster.ID || again.Slug != "maria-p" {
-		t.Fatalf("upsert not idempotent: %v %+v", err, again)
-	}
-	// Re-running for an existing poster is a no-op: name and slug are kept
-	// even when a different name and an explicit slug are passed.
-	same, err := s.UpsertPoster(ctx, "p@example.com", "Renamed", "renamed")
-	if err != nil || same.ID != poster.ID || same.Name != "Maria P." || same.Slug != "maria-p" {
-		t.Fatalf("re-run changed an existing poster: %v %+v", err, same)
-	}
-	if _, err := s.PosterBySlug(ctx, "renamed"); err != ErrNotFound {
-		t.Fatalf("re-run created slug %q: %v", "renamed", err)
-	}
-	other, err := s.UpsertPoster(ctx, "q@example.com", "Maria P.", "maria-p")
-	if err != nil || other.Slug != "maria-p-2" {
-		t.Fatalf("slug suffix: %v %+v", err, other)
-	}
-	u1, _ := s.EnsureUser(ctx, "a@example.com")
-	u2, _ := s.EnsureUser(ctx, "b@example.com")
-	if u1.Role != RoleUser {
-		t.Fatalf("role = %q", u1.Role)
-	}
-	// Promoting a user sets name and slug.
-	promoted, err := s.UpsertPoster(ctx, "a@example.com", "A", "a")
-	if err != nil || promoted.Role != RolePoster || promoted.ID != u1.ID || promoted.Name != "A" || promoted.Slug != "a" {
-		t.Fatalf("promote: %v %+v", err, promoted)
+	u1, _, _ := s.CreateUser(ctx)
+	u2, _, _ := s.CreateUser(ctx)
+	if u1.Role != RoleUser || u1.ID == u2.ID {
+		t.Fatalf("users: %+v %+v", u1, u2)
 	}
 
 	start := time.Now().Add(48 * time.Hour).Truncate(time.Second)
@@ -153,9 +131,9 @@ func TestEventsAndInterests(t *testing.T) {
 func TestFollowsAndFollowingFeed(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
-	p1, _ := s.UpsertPoster(ctx, "p1@example.com", "One", "one")
-	p2, _ := s.UpsertPoster(ctx, "p2@example.com", "Two", "two")
-	u, _ := s.EnsureUser(ctx, "u@example.com")
+	p1, _, _ := s.CreatePoster(ctx, "One", "one")
+	p2, _, _ := s.CreatePoster(ctx, "Two", "two")
+	u, _, _ := s.CreateUser(ctx)
 	start := time.Now().Add(24 * time.Hour)
 	s.CreateEvent(ctx, p1.ID, "a", EventInput{Title: "A", StartsAt: start, Venue: "v", Tags: []string{"film"}})
 	s.CreateEvent(ctx, p2.ID, "b", EventInput{Title: "B", StartsAt: start, Venue: "v", Tags: []string{"talk"}})
@@ -190,31 +168,67 @@ func TestFollowsAndFollowingFeed(t *testing.T) {
 	}
 }
 
-func TestOTPAndSessions(t *testing.T) {
+func TestKeysAndPosters(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
-	exp := time.Now().Add(10 * time.Minute)
-	if _, err := s.LatestOTP(ctx, "x@example.com"); err != ErrNotFound {
-		t.Fatalf("want ErrNotFound, got %v", err)
+	u, key, err := s.CreateUser(ctx)
+	if err != nil || len(key) != 43 {
+		t.Fatalf("create user: %v key=%q", err, key)
 	}
-	s.CreateOTP(ctx, "x@example.com", "h1", exp)
-	s.CreateOTP(ctx, "x@example.com", "h2", exp)
-	o, err := s.LatestOTP(ctx, "x@example.com")
-	if err != nil || o.CodeHash != "h2" {
-		t.Fatalf("supersede: %v %+v", err, o)
+	got, err := s.AccountKey(ctx, u.ID)
+	if err != nil || got != key {
+		t.Fatalf("AccountKey: %v %q != %q", err, got, key)
 	}
-	if n, _ := s.CountRecentOTPs(ctx, "x@example.com", time.Now().Add(-15*time.Minute)); n != 2 {
-		t.Fatalf("recent = %d", n)
+	a, err := s.AccountByKey(ctx, key)
+	if err != nil || a.ID != u.ID || a.Role != RoleUser {
+		t.Fatalf("AccountByKey: %v %+v", err, a)
 	}
-	if a, _ := s.BumpOTPAttempts(ctx, o.ID); a != 1 {
-		t.Fatalf("attempts = %d", a)
+	if _, err := s.AccountByKey(ctx, "nope"); err != ErrNotFound {
+		t.Fatalf("unknown key: %v", err)
 	}
-	s.ConsumeOTP(ctx, o.ID)
-	if _, err := s.LatestOTP(ctx, "x@example.com"); err != ErrNotFound {
-		t.Fatal("consumed code still returned")
+	rotated, err := s.RotateKey(ctx, u.ID)
+	if err != nil || rotated == key || len(rotated) != 43 {
+		t.Fatalf("rotate: %v %q", err, rotated)
+	}
+	if _, err := s.AccountByKey(ctx, key); err != ErrNotFound {
+		t.Fatal("old key still opens the account")
+	}
+	if a, err := s.AccountByKey(ctx, rotated); err != nil || a.ID != u.ID {
+		t.Fatalf("new key: %v", err)
+	}
+	if _, err := s.RotateKey(ctx, 9999); err != ErrNotFound {
+		t.Fatalf("rotate unknown: %v", err)
 	}
 
-	u, _ := s.EnsureUser(ctx, "x@example.com")
+	p, pkey, err := s.CreatePoster(ctx, "Maria P.", "maria-p")
+	if err != nil || p.Role != RolePoster || p.Name != "Maria P." || p.Slug != "maria-p" || len(pkey) != 43 {
+		t.Fatalf("create poster: %v %+v %q", err, p, pkey)
+	}
+	// Re-running for an existing slug is a no-op: same account, nothing
+	// changed, no key handed out.
+	again, akey, err := s.CreatePoster(ctx, "Renamed", "maria-p")
+	if err != nil || again.ID != p.ID || again.Name != "Maria P." || akey != "" {
+		t.Fatalf("re-run: %v %+v %q", err, again, akey)
+	}
+	if a, err := s.AccountByKey(ctx, pkey); err != nil || a.ID != p.ID {
+		t.Fatalf("poster key changed by re-run: %v", err)
+	}
+	if pb, err := s.PosterBySlug(ctx, "maria-p"); err != nil || pb.ID != p.ID {
+		t.Fatalf("PosterBySlug: %v", err)
+	}
+	if _, err := s.PosterBySlug(ctx, "nobody"); err != ErrNotFound {
+		t.Fatalf("unknown poster: %v", err)
+	}
+	// A user's slug is NULL, so many users never collide on the UNIQUE slug.
+	if _, _, err := s.CreateUser(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSessions(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	u, key, _ := s.CreateUser(ctx)
 	s.CreateSession(ctx, "tok", u.ID, time.Now().Add(time.Hour))
 	a, err := s.AccountBySession(ctx, "tok")
 	if err != nil || a.ID != u.ID {
@@ -224,8 +238,20 @@ func TestOTPAndSessions(t *testing.T) {
 	if _, err := s.AccountBySession(ctx, "old"); err != ErrNotFound {
 		t.Fatal("expired session accepted")
 	}
-	s.DeleteAccount(ctx, u.ID)
+	s.DeleteSession(ctx, "tok")
 	if _, err := s.AccountBySession(ctx, "tok"); err != ErrNotFound {
+		t.Fatal("deleted session accepted")
+	}
+	s.CreateSession(ctx, "tok2", u.ID, time.Now().Add(time.Hour))
+	s.FollowTag(ctx, u.ID, "film")
+	s.DeleteAccount(ctx, u.ID)
+	if _, err := s.AccountBySession(ctx, "tok2"); err != ErrNotFound {
 		t.Fatal("session survived account delete")
+	}
+	if _, err := s.AccountByKey(ctx, key); err != ErrNotFound {
+		t.Fatal("key survived account delete")
+	}
+	if f, err := s.Follows(ctx, u.ID); err != nil || f.Any() {
+		t.Fatalf("follows survived account delete: %v %+v", err, f)
 	}
 }

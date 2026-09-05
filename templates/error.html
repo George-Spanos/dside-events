@@ -2,7 +2,7 @@
 {{define "content"}}
 {{if eq .Status 404}}
 <h1>Page not found</h1>
-<p>There's nothing at this address. It may have been removed, or the link was mistyped.</p>
+<p>{{if .Message}}{{.Message}}{{else}}There's nothing at this address. It may have been removed, or the link was mistyped.{{end}}</p>
 {{else if eq .Status 403}}
 <h1>Not allowed</h1>
 <p>{{if .Message}}{{.Message}}{{else}}Your account can't do that.{{end}}</p>

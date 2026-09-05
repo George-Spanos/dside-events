@@ -28,7 +28,6 @@
 
     fetch(form.action, { method: 'POST', body: body, credentials: 'same-origin' })
       .then(function (r) {
-        if (r.redirected && new URL(r.url).pathname === '/login') { location.href = r.url; return ''; }
         if (!r.ok) throw new Error(r.status);
         return r.text();
       })

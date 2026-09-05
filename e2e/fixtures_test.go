@@ -1,12 +1,13 @@
 package e2e
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,27 +32,15 @@ func uid() string {
 	return strconv.FormatInt(epoch, 36) + strconv.FormatInt(seq.Add(1), 36)
 }
 
-// uniqEmail is `prefix-<test>-<id>@example.test`, lower-case and unique.
-func uniqEmail(t testing.TB, prefix string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(t.Name()) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('-')
-		}
-	}
-	name := strings.Trim(b.String(), "-")
-	if len(name) > 24 {
-		name = name[len(name)-24:]
-	}
-	return fmt.Sprintf("%s-%s-%s@example.test", prefix, name, uid())
-}
-
 // uniqTitle is `<base> <id>`: plain ASCII letters and digits, unique per call.
 func uniqTitle(t testing.TB, base string) string {
 	t.Helper()
 	return base + " " + strings.ToUpper(uid())
+}
+
+// uniqSlug is a lower-case poster slug unique per call (for `add-poster -slug`).
+func uniqSlug(base string) string {
+	return base + "-" + strings.ToLower(uid())
 }
 
 // daysFromNow is the Athens calendar day n days from today as 2006-01-02.
@@ -62,73 +51,84 @@ func daysFromNow(n int) string {
 func tomorrow() string  { return daysFromNow(1) }
 func yesterday() string { return daysFromNow(-1) }
 
-// ---- login ------------------------------------------------------------------
+// ---- accounts ---------------------------------------------------------------
 
-// normalise mirrors the server's email normalisation for locating OTP lines.
-func normalise(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
-}
+// secretLinkHref finds the account page's secret link: any href ending in
+// /k/<43-char key>.
+var secretLinkHref = regexp.MustCompile(`href="([^"]*/k/(` + keyPattern + `))"`)
 
-// requestCode posts the first login step.
-func requestCode(c *client, email, next string) resp {
-	c.t.Helper()
-	form := url.Values{"email": {email}}
-	if next != "" {
-		form.Set("next", next)
+// keyPath is the local path of a secret link (`/k/<key>`), so a link printed
+// against any BASE_URL can be opened on the server under test.
+func keyPath(link string) string {
+	m := linkKey.FindStringSubmatch(link)
+	if m == nil {
+		return link
 	}
-	return c.postForm("/login", form)
+	return "/k/" + m[1]
 }
 
-// verifyCode posts the second login step.
-func verifyCode(c *client, code, next string) resp {
-	c.t.Helper()
-	form := url.Values{"code": {code}}
-	if next != "" {
-		form.Set("next", next)
-	}
-	return c.postForm("/login/code", form)
-}
-
-// loginOn runs the whole OTP flow for email against s and returns a
-// logged-in client.
-func loginOn(t testing.TB, s *server, email string) *client {
+// openLink opens the secret link (or bare key path) on server s in a fresh
+// client and asserts the contract: 303 /mine plus a session cookie.
+func openLink(t testing.TB, s *server, link string) *client {
 	t.Helper()
 	c := newClient(t, s)
-	before := otpLineCount(s, normalise(email))
-	r := requestCode(c, email, "")
-	assertRedirectPath(t, r, "/login/code")
-	code := waitOTP(t, s, normalise(email), before+1)
-	r = verifyCode(c, code, "")
-	assertStatus(t, r, 303)
+	r := c.get(keyPath(link))
+	assertRedirect(t, r, "/mine")
+	assertSessionCookieFlags(t, r)
 	if c.cookie("session") == nil {
-		t.Fatalf("login as %s: no session cookie after 303", email)
+		t.Fatalf("open %s: no session cookie in jar after 303", keyPath(link))
 	}
 	return c
 }
 
-// loginAs logs email in on the shared server.
-func loginAs(t testing.TB, email string) *client {
-	t.Helper()
-	return loginOn(t, shared, email)
-}
-
-var (
-	posterJarsMu sync.Mutex
-	posterJars   = map[string]*client{}
-)
-
-// asPoster returns a client logged in as p on the shared server. The session
-// is created once per run and reused so the OTP rate limit never bites.
+// asPoster returns a fresh client logged in as p on the shared server by
+// opening p's secret link.
 func asPoster(t testing.TB, p poster) *client {
 	t.Helper()
-	posterJarsMu.Lock()
-	defer posterJarsMu.Unlock()
-	if c, ok := posterJars[p.Email]; ok {
-		return newClientWithJar(t, shared, c.jar)
+	return openLink(t, shared, p.Link)
+}
+
+// newUser returns a fresh client on the shared server whose account was just
+// created by its first action (a tag follow), then undone so the account
+// follows nothing and has marked nothing.
+func newUser(t testing.TB) *client {
+	t.Helper()
+	return newUserOn(t, shared)
+}
+
+// newUserOn is newUser against server s.
+func newUserOn(t testing.TB, s *server) *client {
+	t.Helper()
+	c := newClient(t, s)
+	r := follow(c, "tag", "concert", "1", "/")
+	assertRedirect(t, r, "/")
+	if c.cookie("session") == nil {
+		t.Fatalf("first POST /follow did not start an account (no session cookie)")
 	}
-	c := loginAs(t, p.Email)
-	posterJars[p.Email] = c
-	return newClientWithJar(t, shared, c.jar)
+	assertRedirect(t, follow(c, "tag", "concert", "0", "/"), "/")
+	return c
+}
+
+// secretLink reads the visitor's secret link from /account and returns the
+// full href and its key.
+func secretLink(t testing.TB, c *client) (link, key string) {
+	t.Helper()
+	r := c.get("/account")
+	assertStatus(t, r, 200)
+	m := secretLinkHref.FindStringSubmatch(r.Body)
+	if m == nil {
+		t.Fatalf("/account shows no secret link (href …/k/<43-char key>)\nbody: %s", snippet(r.Body))
+	}
+	return m[1], m[2]
+}
+
+// randomKey is a well-formed key that belongs to nobody.
+func randomKey() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 // ---- events -----------------------------------------------------------------

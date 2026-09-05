@@ -1,7 +1,6 @@
 package main
 
 import (
-	"html/template"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,18 +10,13 @@ import (
 
 // InterestView drives the "interest" partial (buttons + counter).
 type InterestView struct {
-	Action   string
-	Back     string
-	State    string // "", interested, not_interested
-	Count    int
-	Past     bool
-	LoggedIn bool
-	Compact  bool // /mine rows: only the Interested button, no counter
+	Action  string
+	Back    string
+	State   string // "", interested, not_interested
+	Count   int
+	Past    bool
+	Compact bool // /mine rows: only the Interested button, no counter
 }
-
-// LoginHref is the login link for anonymous visitors, returning to Back.
-// Typed as template.URL so the path stays readable (no %2f escaping).
-func (v InterestView) LoginHref() template.URL { return template.URL("/login?next=" + v.Back) }
 
 // EventRow is one line of the programme list.
 type EventRow struct {
@@ -111,10 +105,10 @@ func viewerID(acct *store.Account) int64 {
 	return acct.ID
 }
 
-func (s *Server) filters(acct *store.Account, path, tag string) []Filter {
-	fs := []Filter{{Label: "all", Href: "/", Active: path == "/" && tag == ""}}
-	if acct != nil {
-		fs = append(fs, Filter{Label: "following", Href: "/following", Active: path == "/following"})
+func (s *Server) filters(path, tag string) []Filter {
+	fs := []Filter{
+		{Label: "all", Href: "/", Active: path == "/" && tag == ""},
+		{Label: "following", Href: "/following", Active: path == "/following"},
 	}
 	for _, t := range tags {
 		fs = append(fs, Filter{Label: t, Href: "/?tag=" + url.QueryEscape(t), Active: path == "/" && tag == t})
@@ -132,15 +126,16 @@ func (s *Server) feed(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	page := feedPage{Base: s.base(r), Filters: s.filters(acct, "/", tag), Empty: "No upcoming events yet. Check back soon."}
+	page := feedPage{Base: s.base(r), Filters: s.filters("/", tag), Empty: "No upcoming events yet. Check back soon."}
 	if tag != "" {
 		page.Empty = "No upcoming events tagged " + tag + "."
+		page.TagFollow = &tagFollowView{Tag: tag, Back: r.URL.RequestURI()}
 		if acct != nil {
 			follows, err := s.store.Follows(r.Context(), acct.ID)
 			if err != nil {
 				return err
 			}
-			page.TagFollow = &tagFollowView{Tag: tag, Back: r.URL.RequestURI(), Following: follows.HasTag(tag)}
+			page.TagFollow.Following = follows.HasTag(tag)
 		}
 	}
 	page.List = s.groupByDay(rows(events))
@@ -155,19 +150,21 @@ func rows(events []store.Event) []EventRow {
 	return out
 }
 
+const nothingFollowed = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
+
+// following is the feed narrowed to followed tags and curators. Without a
+// session (or with nothing followed) it is the same empty state.
 func (s *Server) following(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
+	page := feedPage{Base: s.base(r), Filters: s.filters("/following", ""), Empty: nothingFollowed}
 	if acct == nil {
-		return s.loginRedirect(w, r)
+		return s.render(w, r, http.StatusOK, "feed", page)
 	}
 	follows, err := s.store.Follows(r.Context(), acct.ID)
 	if err != nil {
 		return err
 	}
-	page := feedPage{Base: s.base(r), Filters: s.filters(acct, "/following", "")}
-	if !follows.Any() {
-		page.Empty = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
-	} else {
+	if follows.Any() {
 		page.Empty = "Nothing upcoming from the tags and curators you follow."
 		events, err := s.store.Feed(r.Context(), store.FeedOpts{From: s.midnight(time.Now()), ViewerID: acct.ID, FollowingOnly: true})
 		if err != nil {
@@ -186,10 +183,12 @@ type minePage struct {
 	Empty    bool // no marks at all, neither interested nor hidden
 }
 
+// mine lists the visitor's interested and hidden events; a device without a
+// session sees the empty state.
 func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
 	if acct == nil {
-		return s.loginRedirect(w, r)
+		return s.render(w, r, http.StatusOK, "mine", minePage{Base: s.base(r), Empty: true})
 	}
 	interested, err := s.store.InterestedEvents(r.Context(), acct.ID)
 	if err != nil {
@@ -204,7 +203,7 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	for _, e := range upcoming {
 		rw := row(e)
 		rw.Interest = &InterestView{Action: "/e/" + e.Slug + "/interest", Back: "/mine", State: store.Interested,
-			Count: e.Interested, LoggedIn: true, Compact: true}
+			Count: e.Interested, Compact: true}
 		up = append(up, rw)
 	}
 	page := minePage{Base: s.base(r), Upcoming: s.groupByDay(up), Past: rows(past), Hidden: rows(hidden),
@@ -250,7 +249,7 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
 		Event: eventView{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price,
 			Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug}},
 		Interest: InterestView{Action: "/e/" + e.Slug + "/interest", Back: "/e/" + e.Slug, State: e.ViewerState,
-			Count: e.Interested, Past: past, LoggedIn: acct != nil},
+			Count: e.Interested, Past: past},
 		CanEdit: acct != nil && acct.ID == e.PosterID,
 	}
 	return s.render(w, r, http.StatusOK, "event", page)
@@ -267,8 +266,7 @@ type followView struct {
 type posterPage struct {
 	Base
 	Poster   posterRef
-	Follow   *followView // nil for anonymous visitors and the poster themself
-	Anon     bool
+	Follow   *followView // nil for the poster themself
 	Upcoming DayList
 	Past     []EventRow
 }
@@ -284,14 +282,17 @@ func (s *Server) poster(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	upcoming, past := s.splitPast(events)
-	page := posterPage{Base: s.base(r), Poster: posterRef{p.Name, p.Slug}, Anon: acct == nil,
+	page := posterPage{Base: s.base(r), Poster: posterRef{p.Name, p.Slug},
 		Upcoming: s.groupByDay(rows(upcoming)), Past: rows(past)}
-	if acct != nil && acct.ID != p.ID {
-		follows, err := s.store.Follows(r.Context(), acct.ID)
-		if err != nil {
-			return err
+	if acct == nil || acct.ID != p.ID {
+		page.Follow = &followView{Kind: "poster", Key: p.Slug, Back: r.URL.Path, Label: p.Name}
+		if acct != nil {
+			follows, err := s.store.Follows(r.Context(), acct.ID)
+			if err != nil {
+				return err
+			}
+			page.Follow.Following = follows.HasPoster(p.ID)
 		}
-		page.Follow = &followView{Kind: "poster", Key: p.Slug, Back: r.URL.Path, Following: follows.HasPoster(p.ID), Label: p.Name}
 	}
 	return s.render(w, r, http.StatusOK, "poster", page)
 }

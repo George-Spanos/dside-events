@@ -14,7 +14,7 @@ import (
 var templateFS embed.FS
 
 // pageNames are the templates that define "title" and "content" blocks.
-var pageNames = []string{"feed", "event", "poster", "mine", "login", "login_code", "account", "eventform", "error", "offline"}
+var pageNames = []string{"feed", "event", "poster", "mine", "account", "eventform", "error", "offline"}
 
 // Base is embedded in every page's data.
 type Base struct {
@@ -25,7 +25,6 @@ type Base struct {
 
 // AccountView is what templates know about the viewer.
 type AccountView struct {
-	Email  string
 	Name   string
 	Slug   string
 	Poster bool
@@ -34,7 +33,7 @@ type AccountView struct {
 func (s *Server) base(r *http.Request) Base {
 	b := Base{Path: r.URL.Path, Version: s.version}
 	if a := accountFrom(r); a != nil {
-		b.Account = &AccountView{Email: a.Email, Name: a.Name, Slug: a.Slug, Poster: a.IsPoster()}
+		b.Account = &AccountView{Name: a.Name, Slug: a.Slug, Poster: a.IsPoster()}
 	}
 	return b
 }

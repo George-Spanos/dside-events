@@ -5,7 +5,6 @@
   --fg: #111;
   --muted: #555;
   --link: #0000ee;
-  --visited: #551a8b;
   --error: #b00020;
   --rule: #ccc;
   --measure: 68ch;
@@ -19,7 +18,6 @@
     --fg: #e6e6e6;
     --muted: #a0a0a0;
     --link: #8ab4f8;
-    --visited: #c58af9;
     --error: #ff8080;
     --rule: #3a3a3a;
   }
@@ -46,8 +44,8 @@ h2 {
 }
 h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
 a { color: var(--link); text-decoration: underline; text-underline-offset: .15em; }
-a:visited { color: var(--visited); }
 [aria-current] { font-weight: bold; text-decoration: none; }
+[aria-current] a { color: inherit; text-decoration: none; }
 hr { border: 0; border-top: 1px solid var(--rule); }
 small, .muted, .hint, .count { color: var(--muted); }
 small, .hint { font-size: .9375rem; }

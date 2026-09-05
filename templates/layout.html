@@ -16,13 +16,9 @@
 <header>
   {{if or (eq .Path "/") (eq .Path "/following")}}<h1>dside events</h1>{{else}}<p class="brand"><a href="/">dside events</a></p>{{end}}
   <nav aria-label="Account">
-    {{with .Account}}
-      {{if eq $.Path "/mine"}}<strong aria-current="page">mine</strong>{{else}}<a href="/mine">mine</a>{{end}} ·
-      {{if eq $.Path "/account"}}<strong aria-current="page">account</strong>{{else}}<a href="/account">account</a>{{end}}
-      {{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page">new</strong>{{else}}<a href="/new">new</a>{{end}}{{end}}
-    {{else}}
-      <a href="/mine">mine</a> · <a href="/login">login</a>
-    {{end}}
+    {{if eq .Path "/mine"}}<strong aria-current="page"><a href="/mine">mine</a></strong>{{else}}<a href="/mine">mine</a>{{end}} ·
+    {{if eq .Path "/account"}}<strong aria-current="page"><a href="/account">account</a></strong>{{else}}<a href="/account">account</a>{{end}}
+    {{with .Account}}{{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page"><a href="/new">new</a></strong>{{else}}<a href="/new">new</a>{{end}}{{end}}{{end}}
   </nav>
 </header>
 <main>

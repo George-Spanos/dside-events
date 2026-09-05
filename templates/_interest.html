@@ -1,5 +1,5 @@
 {{define "interest"}}
-{{if and .LoggedIn (not .Past)}}
+{{if not .Past}}
 <form method="post" action="{{.Action}}" data-toggle class="interest">
   <input type="hidden" name="back" value="{{.Back}}">
   <button name="state" value="{{if eq .State "interested"}}clear{{else}}interested{{end}}" aria-pressed="{{if eq .State "interested"}}true{{else}}false{{end}}">Interested</button>
@@ -8,7 +8,7 @@
   {{if eq .State "not_interested"}}<br><small>Hidden from your feed.</small>{{end}}{{end}}
 </form>
 {{else}}
-<p class="interest"><span class="count">{{template "counter" .}}</span>{{if and (not .LoggedIn) (not .Past)}} · <a href="{{.LoginHref}}">Log in to mark interested</a>{{end}}</p>
+<p class="interest"><span class="count">{{template "counter" .}}</span></p>
 {{end}}
 {{end}}
 

@@ -24,6 +24,7 @@ var (
 	errForbidden      = &httpError{status: http.StatusForbidden}
 	errNotFound       = &httpError{status: http.StatusNotFound}
 	errCuratorAccount = &httpError{status: http.StatusForbidden, message: "Curator accounts are removed by hand. Ask us."}
+	errBadLink        = &httpError{status: http.StatusNotFound, message: "This link doesn't work. It may have been replaced with a new one."}
 )
 
 // handlerFunc is an http.HandlerFunc that may return an error instead of

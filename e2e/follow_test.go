@@ -4,9 +4,9 @@ import (
 	"testing"
 )
 
-// spec: FollowTag, UnfollowTag, AccountPage, Feed
+// spec: FollowTag, UnfollowTag, TagFollow, AccountPage, Feed
 func TestFollowTag_FollowUnfollow_Idempotent(t *testing.T) {
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	on := []string{`action="/follow"`, `value="tag"`, `value="dance"`, `value="0"`}
 	off := []string{`action="/follow"`, `value="tag"`, `value="dance"`, `value="1"`}
 
@@ -45,9 +45,9 @@ func TestFollowTag_FollowUnfollow_Idempotent(t *testing.T) {
 	assertRedirect(t, follow(c, "tag", "dance", "0", ""), "/")
 }
 
-// spec: FollowPoster, UnfollowPoster, PosterPageForUser, AccountPage
+// spec: FollowPoster, UnfollowPoster, PosterFollow, PosterPage, AccountPage
 func TestFollowPoster_FollowUnfollow(t *testing.T) {
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	page := "/p/" + poster2.Slug
 	on := []string{`action="/follow"`, `value="poster"`, `value="` + poster2.Slug + `"`, `value="0"`}
 	off := []string{`action="/follow"`, `value="poster"`, `value="` + poster2.Slug + `"`, `value="1"`}
@@ -78,13 +78,32 @@ func TestFollowPoster_FollowUnfollow(t *testing.T) {
 	assertRedirect(t, follow(c, "poster", poster2.Slug, "0", page), page)
 }
 
+// spec: FollowPoster, StartAccount, PosterPage, Visitor
+func TestFollowPoster_AnonStartsAccountFromPosterPage(t *testing.T) {
+	page := "/p/" + poster1.Slug
+	v := anon(t)
+	r := v.get(page)
+	assertStatus(t, r, 200)
+	// The follow button is offered to a visitor without a session too.
+	assertForm(t, r, `action="/follow"`, `value="poster"`, `value="`+poster1.Slug+`"`, `value="1"`)
+
+	r = follow(v, "poster", poster1.Slug, "1", page)
+	assertRedirect(t, r, page)
+	assertSessionCookieFlags(t, r)
+	r = v.get(page)
+	assertForm(t, r, `action="/follow"`, `value="poster"`, `value="`+poster1.Slug+`"`, `value="0"`)
+	r = v.get("/account")
+	assertContains(t, r, `href="`+page+`"`)
+	assertContains(t, r, poster1.Name)
+}
+
 // spec: FollowTag, FollowPoster, PosterFollowTargetsPoster
 func TestFollow_UnknownTargets404(t *testing.T) {
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	assertStatus(t, follow(c, "tag", "opera", "1", "/account"), 404)
 	assertStatus(t, follow(c, "tag", "", "1", "/account"), 404)
 	assertStatus(t, follow(c, "poster", "nobody-here", "1", "/account"), 404)
-	// An event slug or a plain user's email is not a poster key either.
+	// An event slug is not a poster key either.
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	assertStatus(t, follow(c, "poster", slug, "1", "/account"), 404)
 	if r := follow(c, "bogus", "concert", "1", "/account"); r.Status != 400 && r.Status != 404 {
@@ -98,7 +117,7 @@ func TestFollow_UnknownTargets404(t *testing.T) {
 	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="concert"`, `value="0"`)
 }
 
-// spec: Feed
+// spec: Feed, TagFollow, PosterFollow
 func TestFeed_FollowingFilter(t *testing.T) {
 	p1, p2 := asPoster(t, poster1), asPoster(t, poster2)
 	byTag := validEvent(t, tomorrow())
@@ -118,7 +137,7 @@ func TestFeed_FollowingFilter(t *testing.T) {
 	createEvent(t, p1, neither)
 	createEvent(t, p1, pastDance)
 
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	assertRedirect(t, follow(c, "tag", "dance", "1", "/following"), "/following")
 	assertRedirect(t, follow(c, "poster", poster2.Slug, "1", "/following"), "/following")
 
@@ -146,17 +165,29 @@ func TestFeed_FollowingFilter(t *testing.T) {
 func TestFeed_FollowingFilter_EmptyState(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	createEvent(t, asPoster(t, poster1), f)
-	c := loginAs(t, uniqEmail(t, "alice"))
+	c := newUser(t)
 	r := c.get("/following")
 	assertStatus(t, r, 200)
 	assertNotContains(t, r, f.Title)
-	if !containsFold(r.Body, "follow") {
-		t.Errorf("empty following view does not point at following anything\nbody: %s", snippet(r.Body))
-	}
+	assertCopy(t, r, copyFollowEmpty)
 	assertContains(t, r, `href="/`)
 }
 
-// spec: Feed, Login
-func TestFeed_FollowingFilter_AnonRedirect(t *testing.T) {
-	assertLoginRedirect(t, anon(t).get("/following"), "/following")
+// spec: Feed, Visitor
+func TestFeed_FollowingFilter_Anon200Empty(t *testing.T) {
+	f := validEvent(t, tomorrow())
+	createEvent(t, asPoster(t, poster1), f)
+	v := anon(t)
+	r := v.get("/following")
+	assertStatus(t, r, 200)
+	assertNotContains(t, r, f.Title)
+	assertCopy(t, r, copyFollowEmpty)
+	assertNotContains(t, r, `href="/login`)
+	if v.cookie("session") != nil {
+		t.Errorf("GET /following set a session cookie")
+	}
+	// The filter link is offered on the feed for everyone.
+	for _, path := range []string{"/", "/?tag=concert", "/following"} {
+		assertContains(t, v.get(path), `href="/following"`)
+	}
 }

@@ -12,17 +12,18 @@ Most individuals just want to discover events that might interest them.
 **MVP restrictions**
 
 - Two types of users, users and power users.
-- Power users - Curators/artists - People we know, whitelisted, accounts by hand.
+- Power users - Curators/artists - People we know, whitelisted, created by hand with the CLI, which prints their secret login link.
 - No images no videos. All content is text with links to external content. ex musical content related to the event, link to a theater script brief etc.
 - No spam. A single post per event.
 - Events have tags. Tags are a specific defined list.
 - Users - Attendees - ability to follow tags and/or curators/artists.
-- Users - Attendees - email-only accounts with a single otp code for login.
+- Users - Attendees - anonymous accounts. The first Interested or Follow creates the account in a cookie; no sign-up, no email, no personal data. A secret link on the account page carries it to another device. Lose the cookie and the link, lose the list.
 - Simple UI - essentially our app is 
   - a list of upcoming events.
   - a list/calendar of events you're interested in.
   - an event details view.
   - an event create/edit view.
+  - an account view (secret link, forget device, delete).
 - No metrics.
 - One post per event; editing yes, reposting no. Slug/URL immutable.
 - "Not interested" stays internal is not visible to an event.
@@ -31,7 +32,7 @@ Most individuals just want to discover events that might interest them.
   curator. Event pages show who posted.
 - No notifications. Users should open the app to see updates.
 - App should be a PWA.
-- Anon users can just browse, no login required but no follow features.
+- Everyone browses without an account; pressing Interested or Follow starts one.
 
 ### Design direction (founder, firm)
 - As simple and non-obstructive as possible. **Old internet feel.**

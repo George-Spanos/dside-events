@@ -7,10 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"math/big"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -18,12 +15,8 @@ import (
 )
 
 const (
-	sessionCookie  = "session"
-	otpCookie      = "otp_email"
-	sessionTTL     = 90 * 24 * time.Hour
-	otpCookieTTL   = 10 * time.Minute
-	otpMaxIssued   = 3
-	otpIssueWindow = 15 * time.Minute
+	sessionCookie = "session"
+	sessionTTL    = 365 * 24 * time.Hour
 )
 
 type ctxKey struct{}
@@ -44,31 +37,50 @@ func (s *Server) withAccount(next http.Handler) http.Handler {
 	})
 }
 
-// accountFrom returns the logged-in account or nil.
+// accountFrom returns the request's account or nil.
 func accountFrom(r *http.Request) *store.Account {
 	a, _ := r.Context().Value(ctxKey{}).(*store.Account)
 	return a
 }
 
-// loginRedirect sends an anonymous visitor to /login, remembering where to
-// come back to: the request URI for GET/HEAD, the form's `back` field for a
-// POST. A POST path itself is never used as next (it is not revisitable), so
-// without a usable back field the redirect carries no next at all.
-func (s *Server) loginRedirect(w http.ResponseWriter, r *http.Request) error {
-	next := ""
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-		next = r.URL.RequestURI()
-	default:
-		if back := safeNext(r.PostFormValue("back")); back != "/" {
-			next = back
+// ensureAccount returns the request's account, creating an anonymous user
+// account plus a session (and setting the cookie) when there is none. Callers
+// must validate their target first so a 404 never leaves an orphan account.
+func (s *Server) ensureAccount(w http.ResponseWriter, r *http.Request) (*store.Account, error) {
+	if a := accountFrom(r); a != nil {
+		return a, nil
+	}
+	a, _, err := s.store.CreateUser(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	if err := s.startSession(w, r, a.ID); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// startSession creates a session for the account and sets the cookie.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, accountID int64) error {
+	token, err := newToken()
+	if err != nil {
+		return err
+	}
+	if err := s.store.CreateSession(r.Context(), hashToken(token), accountID, time.Now().Add(sessionTTL)); err != nil {
+		return err
+	}
+	s.setSessionCookie(w, token)
+	return nil
+}
+
+// endSession deletes the request's session row (if any) and clears the cookie.
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) error {
+	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
+		if err := s.store.DeleteSession(r.Context(), hashToken(c.Value)); err != nil {
+			return err
 		}
 	}
-	to := "/login"
-	if next != "" {
-		to += "?next=" + url.QueryEscape(next)
-	}
-	http.Redirect(w, r, to, http.StatusSeeOther)
+	s.clearSessionCookie(w)
 	return nil
 }
 
@@ -80,19 +92,15 @@ func safeNext(next string) string {
 	return "/"
 }
 
-func newOTPCode() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
-	if err != nil {
-		return "", err
+// backOr returns the form's `back` field when it is a local path, else def.
+func backOr(r *http.Request, def string) string {
+	if b := r.PostFormValue("back"); b != "" && safeNext(b) == b {
+		return b
 	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+	return def
 }
 
-func hashCode(email, code string) string {
-	sum := sha256.Sum256([]byte(email + ":" + code))
-	return hex.EncodeToString(sum[:])
-}
-
+// newToken returns 32 random bytes as base64url (43 characters).
 func newToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -106,20 +114,6 @@ func hashToken(tok string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// normalizeEmail trims, lowercases and loosely validates an address.
-func normalizeEmail(s string) (string, bool) {
-	s = strings.ToLower(strings.TrimSpace(s))
-	at := strings.LastIndexByte(s, '@')
-	if len(s) > 254 || at < 1 || at == len(s)-1 || strings.ContainsAny(s, " \t\r\n") {
-		return "", false
-	}
-	domain := s[at+1:]
-	if dot := strings.IndexByte(domain, '.'); dot < 1 || dot == len(domain)-1 {
-		return "", false
-	}
-	return s, true
-}
-
 func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: token, Path: "/", MaxAge: int(sessionTTL.Seconds()),
@@ -130,20 +124,6 @@ func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {
 func (s *Server) clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func (s *Server) setOTPCookie(w http.ResponseWriter, email string) {
-	http.SetCookie(w, &http.Cookie{
-		Name: otpCookie, Value: email, Path: "/login", MaxAge: int(otpCookieTTL.Seconds()),
-		HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func (s *Server) clearOTPCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name: otpCookie, Value: "", Path: "/login", MaxAge: -1,
 		HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode,
 	})
 }

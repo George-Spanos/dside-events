@@ -1,8 +1,18 @@
 {{define "title"}}Account · dside events{{end}}
 {{define "content"}}
 <h1>Account</h1>
-<form method="post" action="/logout">{{.Email}} · {{if .Poster}}curator{{else}}user{{end}} <button>Log out</button></form>
+{{if not .Account}}
+<p>This device has no list yet. Press Interested on an event, or follow a tag or a curator, and your account starts here. No sign-up, no email.</p>
+<p>Opened a secret link before? Open it again on this device to continue there.</p>
+{{else}}
 {{if .Poster}}<p>Your curator page: <a href="/p/{{.Slug}}">/p/{{.Slug}}</a>.</p>{{end}}
+
+<h2>Your secret link</h2>
+<p><a href="{{.Link}}">{{.Link}}</a></p>
+<p>Open it on another device to see the same list there. Anyone with this link is you, so keep it to yourself.</p>
+<form method="post" action="/account/key">
+  <button>Get a new link</button> <small>The old link stops working.</small>
+</form>
 
 <h2>Following</h2>
 <h3>Tags</h3>
@@ -32,6 +42,11 @@
 <p class="muted">You're not following any curators yet. Follow one from an event page.</p>
 {{end}}
 
+<h2>This device</h2>
+<form method="post" action="/forget">
+  <button>Forget this device</button> <small>Your list stays; the secret link brings it back.</small>
+</form>
+
 <h2>Delete account</h2>
 {{if .Poster}}
 <p>Curator accounts are removed by hand. Ask us.</p>
@@ -42,5 +57,6 @@
   <label class="check"><input type="checkbox" name="confirm" value="1" required{{if .Error}} aria-invalid="true" aria-describedby="confirm-err"{{end}}> I understand</label>
   <button>Delete my account</button>
 </form>
+{{end}}
 {{end}}
 {{end}}

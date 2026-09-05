@@ -1,7 +1,7 @@
 {{define "title"}}{{if eq .Path "/"}}dside events{{else}}Following · dside events{{end}}{{end}}
 {{define "content"}}
 <nav class="filters" aria-label="Filter events">
-  {{range $i, $f := .Filters}}{{if $i}} · {{end}}{{if $f.Active}}<strong aria-current="page">{{$f.Label}}</strong>{{else}}<a href="{{$f.Href}}">{{$f.Label}}</a>{{end}}{{end}}
+  {{range $i, $f := .Filters}}{{if $i}} · {{end}}{{if $f.Active}}<strong aria-current="page"><a href="{{$f.Href}}">{{$f.Label}}</a></strong>{{else}}<a href="{{$f.Href}}">{{$f.Label}}</a>{{end}}{{end}}
 </nav>
 {{with .TagFollow}}
 <form method="post" action="/follow" data-toggle class="inline">

@@ -5,19 +5,13 @@ import (
 	"testing"
 )
 
-// spec: AccountPage, FollowTag, FollowPoster
-func TestAccount_ShowsEmailRoleFollows(t *testing.T) {
-	email := uniqEmail(t, "alice")
-	c := loginAs(t, email)
+// spec: AccountPage, FollowTag, FollowPoster, UnfollowTag, TagFollow, PosterFollow
+func TestAccount_ShowsFollowsAndTagToggles(t *testing.T) {
+	c := newUser(t)
 
 	r := c.get("/account")
 	assertStatus(t, r, 200)
-	assertContains(t, r, email)
-	if !containsFold(r.Body, "user") {
-		t.Errorf("account page does not name the role")
-	}
-	assertForm(t, r, `action="/logout"`)
-	assertForm(t, r, `action="/account/delete"`, `name="confirm"`)
+	assertContains(t, r, "<h2>Following</h2>")
 	// Every tag can be followed from here.
 	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
 		assertForm(t, r, `action="/follow"`, `value="tag"`, `value="`+tag+`"`, `value="1"`)
@@ -34,28 +28,39 @@ func TestAccount_ShowsEmailRoleFollows(t *testing.T) {
 	assertContains(t, r, `href="/p/`+poster2.Slug+`"`)
 	assertForm(t, r, `action="/follow"`, `value="poster"`, `value="`+poster2.Slug+`"`, `value="0"`)
 
-	// A poster's account page: role, link to own curator page, no delete form.
-	r = asPoster(t, poster1).get("/account")
+	assertRedirect(t, follow(c, "tag", "film", "0", "/account"), "/account")
+	assertForm(t, c.get("/account"), `action="/follow"`, `value="tag"`, `value="film"`, `value="1"`)
+}
+
+// spec: AccountPage, Poster, SecretLink, PosterPage
+func TestAccount_Poster_CuratorPageAndNoDelete(t *testing.T) {
+	r := asPoster(t, poster1).get("/account")
 	assertStatus(t, r, 200)
-	assertContains(t, r, poster1.Email)
+	assertContains(t, r, "Your curator page")
 	assertContains(t, r, `href="/p/`+poster1.Slug+`"`)
+	assertContains(t, r, "<h2>Your secret link</h2>")
+	assertContains(t, r, `href="`+poster1.Link+`"`)
+	assertForm(t, r, `action="/account/key"`)
+	assertForm(t, r, `action="/forget"`)
 	assertNoForm(t, r, `action="/account/delete"`)
 	if !containsFold(r.Body, "by hand") {
 		t.Errorf("poster account page does not say curator accounts are removed by hand")
 	}
+	assertNotContains(t, r, "@")
 }
 
-// spec: DeleteAccount, AccountPage, Event.interested_count
-func TestDeleteAccount_RemovesDataAndSession(t *testing.T) {
+// spec: DeleteAccount, AccountPage, Event.interested_count, Session, SecretLink, Interest, TagFollow, PosterFollow
+func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
-	email := uniqEmail(t, "alice")
-	c := loginAs(t, email)
+	c := newUser(t)
 	old := c.cookie("session")
 	assertRedirect(t, setInterest(c, slug, "interested", page), page)
 	assertRedirect(t, follow(c, "tag", "party", "1", "/account"), "/account")
 	assertRedirect(t, follow(c, "poster", poster1.Slug, "1", "/account"), "/account")
+	link, _ := secretLink(t, c)
+	other := openLink(t, shared, link) // the same account on a second device
 	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
 		t.Fatalf("counter = %d, want 1", n)
 	}
@@ -65,44 +70,65 @@ func TestDeleteAccount_RemovesDataAndSession(t *testing.T) {
 	if c.cookie("session") != nil {
 		t.Errorf("session cookie still in jar after account deletion")
 	}
-	assertLoginRedirect(t, c.get("/account"), "/account")
+	r = c.get("/account")
+	assertStatus(t, r, 200)
+	assertCopy(t, r, copyAccountNone)
 
-	// The session row is gone, not just the cookie.
+	// The session rows are gone, not just the cookie: the old token and the
+	// second device are anonymous now.
 	replay := anon(t)
 	replay.setRawCookie("session", old.Value, "/")
-	assertLoginRedirect(t, replay.get("/account"), "/account")
+	r = replay.get("/account")
+	assertStatus(t, r, 200)
+	assertCopy(t, r, copyAccountNone)
+	assertNotContains(t, replay.get("/mine"), f.Title)
+	r = other.get("/mine")
+	assertStatus(t, r, 200)
+	assertNotContains(t, r, f.Title)
+	assertCopy(t, other.get("/account"), copyAccountNone)
+
+	// The secret link is dead.
+	r = anon(t).get(keyPath(link))
+	assertStatus(t, r, 404)
+	assertCopy(t, r, copyLinkBroken)
 
 	// Interests cascaded: the public counter drops.
 	if n := interestedCount(t, anon(t).get(page).Body); n != 0 {
 		t.Errorf("counter after account deletion = %d, want 0", n)
 	}
 
-	// Logging in again starts from a clean account.
-	again := loginAs(t, email)
-	r = again.get("/account")
-	assertStatus(t, r, 200)
-	assertContains(t, r, email)
+	// Pressing Interested again starts from a clean, different account.
+	assertRedirect(t, setInterest(c, slug, "interested", page), page)
+	if l, _ := secretLink(t, c); l == link {
+		t.Errorf("new account after deletion got the deleted link back")
+	}
+	r = c.get("/account")
 	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="party"`, `value="0"`)
 	assertNotContains(t, r, `href="/p/`+poster1.Slug+`"`)
-	assertNotContains(t, again.get("/mine"), f.Title)
-	assertNotContains(t, again.get(page), "Hidden from your feed")
-}
-
-// spec: DeleteAccount
-func TestDeleteAccount_RequiresConfirm(t *testing.T) {
-	email := uniqEmail(t, "alice")
-	c := loginAs(t, email)
-	assertStatus(t, c.postForm("/account/delete", nil), 422)
-	assertStatus(t, c.postForm("/account/delete", url.Values{"confirm": {"0"}}), 422)
-	assertStatus(t, c.postForm("/account/delete", url.Values{"confirm": {"yes"}}), 422)
-	// Still logged in, still there.
-	r := c.get("/account")
-	assertStatus(t, r, 200)
-	assertContains(t, r, email)
-	assertStatus(t, c.get("/account/delete"), 405)
+	assertNotContains(t, c.get(page), "Hidden from your feed")
+	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+		t.Errorf("counter = %d, want 1 (new account only)", n)
+	}
 }
 
 // spec: DeleteAccount, AccountPage
+func TestDeleteAccount_RequiresConfirm(t *testing.T) {
+	c := newUser(t)
+	link, _ := secretLink(t, c)
+	assertStatus(t, c.postForm("/account/delete", nil), 422)
+	assertStatus(t, c.postForm("/account/delete", url.Values{"confirm": {"0"}}), 422)
+	assertStatus(t, c.postForm("/account/delete", url.Values{"confirm": {"yes"}}), 422)
+	// Still there, still the same account.
+	if c.cookie("session") == nil {
+		t.Fatalf("a refused delete cleared the cookie")
+	}
+	if l, _ := secretLink(t, c); l != link {
+		t.Errorf("a refused delete changed the account (link %q → %q)", link, l)
+	}
+	assertStatus(t, c.get("/account/delete"), 405)
+}
+
+// spec: DeleteAccount, AccountPage, Poster
 func TestDeleteAccount_PosterForbidden(t *testing.T) {
 	p := asPoster(t, poster2)
 	r := p.postForm("/account/delete", url.Values{"confirm": {"1"}})
@@ -110,7 +136,8 @@ func TestDeleteAccount_PosterForbidden(t *testing.T) {
 	if !containsFold(r.Body, "by hand") {
 		t.Errorf("403 body does not say curator accounts are removed by hand\nbody: %s", snippet(r.Body))
 	}
-	// Still a poster, still logged in.
+	// Still a poster, still logged in, link still works.
 	assertStatus(t, p.get("/new"), 200)
 	assertStatus(t, anon(t).get("/p/"+poster2.Slug), 200)
+	assertStatus(t, asPoster(t, poster2).get("/new"), 200)
 }

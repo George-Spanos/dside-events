@@ -3,28 +3,31 @@
 BIN      := bin/dside-events
 ADDR     ?= 127.0.0.1:8080
 DB_PATH  ?= events.db
-OTP_FILE ?= otp.log
+BASE_URL ?= http://$(ADDR)
 
-# Overridable poster details for `make poster`.
-EMAIL ?=
-NAME  ?=
-SLUG  ?=
+# Overridable curator details for `make poster` / `make poster-link`.
+NAME ?=
+SLUG ?=
 
-.PHONY: help build run poster test e2e check fmt vet docker-up docker-down docker-poster clean
+.PHONY: help build run poster poster-link test e2e check fmt vet docker-up docker-down docker-poster docker-poster-link clean
 
 help: ## show this list
-	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
 
 build: ## compile the binary into bin/
 	@mkdir -p bin
 	CGO_ENABLED=0 go build -trimpath -o $(BIN) .
 
-run: build ## start the dev server (codes go to otp.log, DB to events.db)
-	ADDR=$(ADDR) DB_PATH=$(DB_PATH) DEV_OTP_FILE=$(OTP_FILE) $(BIN) serve
+run: build ## start the dev server (DB in events.db)
+	ADDR=$(ADDR) DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) serve
 
-poster: build ## make someone a curator: make poster EMAIL=x@y.gr NAME="Maria P." [SLUG=maria]
-	@test -n "$(EMAIL)" -a -n "$(NAME)" || { echo 'usage: make poster EMAIL=x@y.gr NAME="Maria P." [SLUG=maria]'; exit 2; }
-	DB_PATH=$(DB_PATH) $(BIN) add-poster -email "$(EMAIL)" -name "$(NAME)" $(if $(SLUG),-slug "$(SLUG)")
+poster: build ## make a curator, prints their secret link: make poster NAME="Maria P." [SLUG=maria]
+	@test -n "$(NAME)" || { echo 'usage: make poster NAME="Maria P." [SLUG=maria]'; exit 2; }
+	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) add-poster -name "$(NAME)" $(if $(SLUG),-slug "$(SLUG)")
+
+poster-link: build ## new secret link for a curator (the old one stops working): make poster-link SLUG=maria
+	@test -n "$(SLUG)" || { echo 'usage: make poster-link SLUG=maria'; exit 2; }
+	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) poster-link -slug "$(SLUG)"
 
 test: ## unit tests (store, slug)
 	go test . ./internal/...
@@ -46,9 +49,13 @@ docker-up: ## build the image and start it with a data volume
 docker-down: ## stop the container (keeps the volume)
 	docker compose down
 
-docker-poster: ## curator inside docker: make docker-poster EMAIL=x@y.gr NAME="Maria P."
-	@test -n "$(EMAIL)" -a -n "$(NAME)" || { echo 'usage: make docker-poster EMAIL=x@y.gr NAME="Maria P."'; exit 2; }
-	docker compose exec events /dside-events add-poster -email "$(EMAIL)" -name "$(NAME)"
+docker-poster: ## curator inside docker: make docker-poster NAME="Maria P." [SLUG=maria]
+	@test -n "$(NAME)" || { echo 'usage: make docker-poster NAME="Maria P." [SLUG=maria]'; exit 2; }
+	docker compose exec events /dside-events add-poster -name "$(NAME)" $(if $(SLUG),-slug "$(SLUG)")
 
-clean: ## remove the binary, the dev database and the otp log
-	rm -rf bin $(DB_PATH) $(DB_PATH)-wal $(DB_PATH)-shm $(OTP_FILE)
+docker-poster-link: ## new curator link inside docker: make docker-poster-link SLUG=maria
+	@test -n "$(SLUG)" || { echo 'usage: make docker-poster-link SLUG=maria'; exit 2; }
+	docker compose exec events /dside-events poster-link -slug "$(SLUG)"
+
+clean: ## remove the binary and the dev database
+	rm -rf bin $(DB_PATH) $(DB_PATH)-wal $(DB_PATH)-shm

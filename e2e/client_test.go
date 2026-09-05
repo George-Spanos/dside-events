@@ -19,6 +19,7 @@ type client struct {
 	base *url.URL
 	hc   *http.Client
 	jar  *cookiejar.Jar
+	s    *server
 }
 
 // resp is the part of an HTTP response the tests look at.
@@ -56,6 +57,7 @@ func newClientWithJar(t testing.TB, s *server, jar *cookiejar.Jar) *client {
 		t:    t,
 		base: base,
 		jar:  jar,
+		s:    s,
 		hc: &http.Client{
 			Jar:     jar,
 			Timeout: 10 * time.Second,
@@ -66,12 +68,14 @@ func newClientWithJar(t testing.TB, s *server, jar *cookiejar.Jar) *client {
 	}
 }
 
-// anon is a fresh visitor of the shared server.
+// anon is a fresh visitor of the shared server: no cookie, no account.
 func anon(t testing.TB) *client {
 	t.Helper()
 	return newClient(t, shared)
 }
 
+// abs resolves path against the client's server. An absolute URL is taken
+// as is.
 func (c *client) abs(path string) string {
 	u, err := url.Parse(path)
 	if err != nil {
@@ -123,15 +127,12 @@ func (c *client) follow(r resp) resp {
 	return c.get(r.Location)
 }
 
-// cookie returns the named cookie as the jar would send it for "/" or
-// "/login", or nil.
+// cookie returns the named cookie as the jar would send it for "/", or nil.
 func (c *client) cookie(name string) *http.Cookie {
-	for _, p := range []string{"/", "/login", "/login/code"} {
-		u, _ := url.Parse(c.abs(p))
-		for _, ck := range c.jar.Cookies(u) {
-			if ck.Name == name {
-				return ck
-			}
+	u, _ := url.Parse(c.abs("/"))
+	for _, ck := range c.jar.Cookies(u) {
+		if ck.Name == name {
+			return ck
 		}
 	}
 	return nil
@@ -141,6 +142,16 @@ func (c *client) cookie(name string) *http.Cookie {
 func (c *client) setRawCookie(name, value, path string) {
 	u, _ := url.Parse(c.abs(path))
 	c.jar.SetCookies(u, []*http.Cookie{{Name: name, Value: value, Path: path}})
+}
+
+// sessionSetCookie returns the Set-Cookie header for the session cookie, or "".
+func sessionSetCookie(r resp) string {
+	for _, sc := range r.Header.Values("Set-Cookie") {
+		if strings.HasPrefix(sc, "session=") {
+			return sc
+		}
+	}
+	return ""
 }
 
 // ---- assertions -----------------------------------------------------------
@@ -198,20 +209,6 @@ func assertRedirectPath(t testing.TB, r resp, wantPath string) {
 	}
 }
 
-// assertLoginRedirect wants a 303 to /login; when wantNext is not empty the
-// decoded `next` query value must equal it.
-func assertLoginRedirect(t testing.TB, r resp, wantNext string) {
-	t.Helper()
-	assertRedirectPath(t, r, "/login")
-	if wantNext == "" {
-		return
-	}
-	u, _ := url.Parse(r.Location)
-	if got := u.Query().Get("next"); got != wantNext {
-		t.Fatalf("Location = %q: next = %q, want %q", r.Location, got, wantNext)
-	}
-}
-
 func assertContains(t testing.TB, r resp, want string) {
 	t.Helper()
 	if !strings.Contains(r.Body, want) {
@@ -223,6 +220,31 @@ func assertNotContains(t testing.TB, r resp, unwanted string) {
 	t.Helper()
 	if strings.Contains(r.Body, unwanted) {
 		t.Errorf("body must not contain %q\nbody: %s", unwanted, snippet(r.Body))
+	}
+}
+
+// plainText undoes HTML escaping and typographic apostrophes so copy with
+// "don't" / "You're" matches however the template emitted it.
+func plainText(body string) string {
+	s := html.UnescapeString(body)
+	s = strings.NewReplacer("’", "'", "‘", "'").Replace(s)
+	return spaces.ReplaceAllString(s, " ")
+}
+
+// assertCopy wants the sentence want (from the contract's copy) in the body,
+// ignoring HTML escaping, curly apostrophes and whitespace runs.
+func assertCopy(t testing.TB, r resp, want string) {
+	t.Helper()
+	if !strings.Contains(plainText(r.Body), plainText(want)) {
+		t.Errorf("body lacks copy %q\nbody: %s", want, snippet(r.Body))
+	}
+}
+
+// assertNoCopy is the negation of assertCopy.
+func assertNoCopy(t testing.TB, r resp, unwanted string) {
+	t.Helper()
+	if strings.Contains(plainText(r.Body), plainText(unwanted)) {
+		t.Errorf("body must not contain copy %q\nbody: %s", unwanted, snippet(r.Body))
 	}
 }
 
@@ -252,6 +274,24 @@ func assertBefore(t testing.TB, r resp, a, b string) {
 	}
 	if ia > ib {
 		t.Errorf("%q (at %d) should come before %q (at %d)", a, ia, b, ib)
+	}
+}
+
+// assertSessionCookieFlags checks the Set-Cookie header that starts a
+// session: HttpOnly, SameSite=Lax, Path=/ and a 365-day lifetime.
+func assertSessionCookieFlags(t testing.TB, r resp) {
+	t.Helper()
+	sc := sessionSetCookie(r)
+	if sc == "" {
+		t.Fatalf("no Set-Cookie for session; headers: %v", r.Header)
+	}
+	for _, want := range []string{"HttpOnly", "SameSite=Lax", "Path=/"} {
+		if !strings.Contains(sc, want) {
+			t.Errorf("Set-Cookie %q lacks %s", sc, want)
+		}
+	}
+	if !strings.Contains(sc, "Max-Age=31536000") && !strings.Contains(sc, "Expires=") {
+		t.Errorf("Set-Cookie %q is not persistent (want Max-Age=31536000 or Expires)", sc)
 	}
 }
 
@@ -309,15 +349,11 @@ func assertNoForm(t testing.TB, r resp, fragments ...string) {
 
 var hrefAttr = regexp.MustCompile(`href="([^"]*)"`)
 
-// hasLoginLink reports whether body links to /login with next == wantNext
-// (any URL encoding of next is accepted).
-func hasLoginLink(body, wantNext string) bool {
+// hasLinkToPath reports whether body links to a URL whose path is wantPath.
+func hasLinkToPath(body, wantPath string) bool {
 	for _, m := range hrefAttr.FindAllStringSubmatch(body, -1) {
 		u, err := url.Parse(html.UnescapeString(m[1]))
-		if err != nil || u.Path != "/login" {
-			continue
-		}
-		if u.Query().Get("next") == wantNext {
+		if err == nil && u.Path == wantPath {
 			return true
 		}
 	}
@@ -331,7 +367,7 @@ func formTags(body string) []string {
 	return formTag.FindAllString(body, -1)
 }
 
-// lower is a case-insensitive contains.
+// containsFold is a case-insensitive contains.
 func containsFold(body, want string) bool {
 	return strings.Contains(strings.ToLower(body), strings.ToLower(want))
 }

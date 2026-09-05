@@ -17,13 +17,11 @@ import (
 	"time"
 )
 
-// server is one running `dside-events serve` process with its own SQLite
-// file and DEV_OTP_FILE.
+// server is one running `dside-events serve` process with its own SQLite file.
 type server struct {
-	dir     string
-	dbPath  string
-	otpFile string
-	url     string // http://127.0.0.1:PORT, no trailing slash
+	dir    string
+	dbPath string
+	url    string // http://127.0.0.1:PORT, no trailing slash
 
 	cmd  *exec.Cmd
 	done chan struct{}
@@ -33,23 +31,17 @@ type server struct {
 	dumped int
 }
 
-// serverOpts configures a per-test server.
-type serverOpts struct {
-	// env adds or overrides environment variables, e.g. OTP_TTL, OTP_MAX_ATTEMPTS.
-	env map[string]string
-}
-
 var listeningLine = regexp.MustCompile(`^listening on (http://127\.0\.0\.1:\d+)\s*$`)
 
-// startServer launches a fresh server for one test and stops it on cleanup.
-// Its log is attached to the test output when the test fails.
-func startServer(t *testing.T, opts serverOpts) *server {
+// startServer launches a fresh server (empty database) for one test and stops
+// it on cleanup. Its log is attached to the test output when the test fails.
+func startServer(t *testing.T) *server {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "dside-e2e-test-")
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := launchServer(dir, opts.env)
+	s, err := launchServer(dir)
 	if err != nil {
 		os.RemoveAll(dir)
 		t.Fatalf("start server: %v", err)
@@ -64,29 +56,22 @@ func startServer(t *testing.T, opts serverOpts) *server {
 	return s
 }
 
-// launchServer starts `serve` in dir and waits for the listening line and a
-// healthy /healthz.
-func launchServer(dir string, env map[string]string) (*server, error) {
+// launchServer starts `serve` in dir with `ADDR=127.0.0.1:0 DB_PATH=…` and
+// waits for the listening line and a healthy /healthz.
+func launchServer(dir string) (*server, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
 	s := &server{
-		dir:     dir,
-		dbPath:  filepath.Join(dir, "events.db"),
-		otpFile: filepath.Join(dir, "otp.log"),
-		done:    make(chan struct{}),
+		dir:    dir,
+		dbPath: filepath.Join(dir, "events.db"),
+		done:   make(chan struct{}),
 	}
 	cmd := exec.Command(binPath, "serve")
 	cmd.Env = append(os.Environ(),
 		"ADDR=127.0.0.1:0",
 		"DB_PATH="+s.dbPath,
-		"DEV_OTP_FILE="+s.otpFile,
-		"SMTP_HOST=",
-		"LOG_LEVEL=debug",
 	)
-	for k, v := range env {
-		cmd.Env = append(cmd.Env, k+"="+v)
-	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -215,77 +200,110 @@ func (s *server) dumpNewLogs(t testing.TB) {
 	}
 }
 
-var posterLine = regexp.MustCompile(`(?m)^poster (\S+) (\S+)\s*$`)
+// ---- CLI --------------------------------------------------------------------
 
-// runAddPoster runs `dside-events add-poster` against dbPath and parses
-// `poster <slug> <email>` from its stdout.
-func runAddPoster(dbPath, email, name string) (poster, error) {
-	cmd := exec.Command(binPath, "add-poster", "-email", email, "-name", name)
-	cmd.Env = append(os.Environ(), "DB_PATH="+dbPath, "LOG_LEVEL=warn")
+const (
+	// linkUnchanged is the second line `add-poster` prints for a slug that
+	// already exists.
+	linkUnchanged = "link (unchanged, run poster-link to get a new one)"
+)
+
+var (
+	keyPattern = `[A-Za-z0-9_-]{43}`
+	posterLine = regexp.MustCompile(`(?m)^poster (\S+)\s*$`)
+	linkLine   = regexp.MustCompile(`(?m)^link (\S+)\s*$`)
+	linkKey    = regexp.MustCompile(`/k/(` + keyPattern + `)$`)
+)
+
+// runCLI runs the binary with args against s's database, with BASE_URL set to
+// s's address so printed links open on that server. It returns stdout.
+func runCLI(s *server, args ...string) (string, error) {
+	cmd := exec.Command(binPath, args...)
+	cmd.Env = append(os.Environ(), "DB_PATH="+s.dbPath, "BASE_URL="+s.url)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return poster{}, fmt.Errorf("add-poster %s: %v\nstdout: %s\nstderr: %s", email, err, stdout.String(), stderr.String())
+		return stdout.String(), fmt.Errorf("%s: %v\nstdout: %s\nstderr: %s", strings.Join(args, " "), err, stdout.String(), stderr.String())
 	}
-	m := posterLine.FindStringSubmatch(stdout.String())
-	if m == nil {
-		return poster{}, fmt.Errorf("add-poster %s: stdout lacks 'poster <slug> <email>':\n%s", email, stdout.String())
-	}
-	return poster{Email: m[2], Name: name, Slug: m[1]}, nil
+	return stdout.String(), nil
 }
 
-// addPoster is runAddPoster for use inside a test, against s's database.
-func addPoster(t testing.TB, s *server, email, name string) poster {
+// parseLink extracts `link <url>` from CLI output and the key inside the url.
+func parseLink(out string) (link, key string, err error) {
+	m := linkLine.FindStringSubmatch(out)
+	if m == nil {
+		return "", "", fmt.Errorf("stdout lacks 'link <url>':\n%s", out)
+	}
+	k := linkKey.FindStringSubmatch(m[1])
+	if k == nil {
+		return "", "", fmt.Errorf("link %q does not end in /k/<43-char key>", m[1])
+	}
+	return m[1], k[1], nil
+}
+
+// runAddPoster runs `dside-events add-poster -name <name> [-slug <slug>]`
+// against s and parses the two output lines `poster <slug>` and `link <url>`.
+// It fails for a no-op run (existing slug); use addPosterRaw for that case.
+func runAddPoster(s *server, name, slug string) (poster, error) {
+	args := []string{"add-poster", "-name", name}
+	if slug != "" {
+		args = append(args, "-slug", slug)
+	}
+	out, err := runCLI(s, args...)
+	if err != nil {
+		return poster{}, fmt.Errorf("add-poster %q: %w", name, err)
+	}
+	m := posterLine.FindStringSubmatch(out)
+	if m == nil {
+		return poster{}, fmt.Errorf("add-poster %q: stdout lacks 'poster <slug>':\n%s", name, out)
+	}
+	link, key, err := parseLink(out)
+	if err != nil {
+		return poster{}, fmt.Errorf("add-poster %q: %v", name, err)
+	}
+	return poster{Name: name, Slug: m[1], Link: link, Key: key}, nil
+}
+
+// addPoster is runAddPoster for use inside a test.
+func addPoster(t testing.TB, s *server, name, slug string) poster {
 	t.Helper()
-	p, err := runAddPoster(s.dbPath, email, name)
+	p, err := runAddPoster(s, name, slug)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return p
 }
 
-// otpCodes returns every code the DEV_OTP_FILE holds for email, oldest first.
-// Lines are `<RFC3339>\t<email>\t<code>`.
-func (s *server) otpCodes(email string) []string {
-	data, err := os.ReadFile(s.otpFile)
+// addPosterRaw runs add-poster and returns its raw stdout (for the no-op case).
+func addPosterRaw(t testing.TB, s *server, name, slug string) string {
+	t.Helper()
+	args := []string{"add-poster", "-name", name}
+	if slug != "" {
+		args = append(args, "-slug", slug)
+	}
+	out, err := runCLI(s, args...)
 	if err != nil {
-		return nil
+		t.Fatal(err)
 	}
-	var codes []string
-	for _, line := range strings.Split(string(data), "\n") {
-		f := strings.Split(strings.TrimRight(line, "\r"), "\t")
-		if len(f) == 3 && f[1] == email {
-			codes = append(codes, f[2])
-		}
-	}
-	return codes
+	return out
 }
 
-// waitOTP polls until at least minCount codes exist for email and returns the
-// most recent one.
-func waitOTP(t testing.TB, s *server, email string, minCount int) string {
+// posterLink runs `dside-events poster-link -slug <slug>` against s and
+// returns the new link and its key.
+func posterLink(t testing.TB, s *server, slug string) (link, key string) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		codes := s.otpCodes(email)
-		if len(codes) >= minCount {
-			return codes[len(codes)-1]
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("no OTP line for %s in %s (have %d, want %d)", email, s.otpFile, len(codes), minCount)
-		}
-		time.Sleep(50 * time.Millisecond)
+	out, err := runCLI(s, "poster-link", "-slug", slug)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-// readOTP returns the last code delivered to email (waiting for at least one).
-func readOTP(t testing.TB, s *server, email string) string {
-	t.Helper()
-	return waitOTP(t, s, email, 1)
-}
-
-// otpLineCount is how many codes have been delivered to email so far.
-func otpLineCount(s *server, email string) int {
-	return len(s.otpCodes(email))
+	link, key, err = parseLink(out)
+	if err != nil {
+		t.Fatalf("poster-link -slug %s: %v", slug, err)
+	}
+	if strings.Contains(out, "poster ") && posterLine.MatchString(out) {
+		// Not forbidden, but the contract only promises the link line.
+		t.Logf("poster-link also printed a poster line:\n%s", out)
+	}
+	return link, key
 }

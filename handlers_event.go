@@ -23,13 +23,10 @@ func (s *Server) formPage(r *http.Request, f *eventForm, e *store.Event) eventFo
 	return p
 }
 
-// requirePoster returns the poster account, or writes the login redirect /
-// returns 403. A nil account with a nil error means the redirect was sent.
-func (s *Server) requirePoster(w http.ResponseWriter, r *http.Request) (*store.Account, error) {
+// requirePoster returns the poster account, or 403 for everyone else
+// (anonymous visitors included: there is no login page to send them to).
+func (s *Server) requirePoster(r *http.Request) (*store.Account, error) {
 	acct := accountFrom(r)
-	if acct == nil {
-		return nil, s.loginRedirect(w, r)
-	}
 	if !acct.IsPoster() {
 		return nil, errForbidden
 	}
@@ -37,16 +34,15 @@ func (s *Server) requirePoster(w http.ResponseWriter, r *http.Request) (*store.A
 }
 
 func (s *Server) newForm(w http.ResponseWriter, r *http.Request) error {
-	acct, err := s.requirePoster(w, r)
-	if acct == nil {
+	if _, err := s.requirePoster(r); err != nil {
 		return err
 	}
 	return s.render(w, r, http.StatusOK, "eventform", s.formPage(r, &eventForm{TagSet: map[string]bool{}}, nil))
 }
 
 func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request) error {
-	acct, err := s.requirePoster(w, r)
-	if acct == nil {
+	acct, err := s.requirePoster(r)
+	if err != nil {
 		return err
 	}
 	f, in := s.parseEventForm(r)
@@ -65,11 +61,11 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request) error {
 	return redirect(w, r, "/e/"+slug)
 }
 
-// ownedEvent loads the event and checks the viewer owns it.
-func (s *Server) ownedEvent(w http.ResponseWriter, r *http.Request) (*store.Account, *store.Event, error) {
-	acct := accountFrom(r)
-	if acct == nil {
-		return nil, nil, s.loginRedirect(w, r)
+// ownedEvent loads the event and checks the viewer is the poster who owns it.
+func (s *Server) ownedEvent(r *http.Request) (*store.Account, *store.Event, error) {
+	acct, err := s.requirePoster(r)
+	if err != nil {
+		return nil, nil, err
 	}
 	e, err := s.store.EventBySlug(r.Context(), r.PathValue("slug"), acct.ID)
 	if err != nil {
@@ -82,16 +78,16 @@ func (s *Server) ownedEvent(w http.ResponseWriter, r *http.Request) (*store.Acco
 }
 
 func (s *Server) editForm(w http.ResponseWriter, r *http.Request) error {
-	_, e, err := s.ownedEvent(w, r)
-	if e == nil {
+	_, e, err := s.ownedEvent(r)
+	if err != nil {
 		return err
 	}
 	return s.render(w, r, http.StatusOK, "eventform", s.formPage(r, s.formFromEvent(e), e))
 }
 
 func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request) error {
-	acct, e, err := s.ownedEvent(w, r)
-	if e == nil {
+	acct, e, err := s.ownedEvent(r)
+	if err != nil {
 		return err
 	}
 	f, in := s.parseEventForm(r)
@@ -110,8 +106,8 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) deleteEvent(w http.ResponseWriter, r *http.Request) error {
-	_, e, err := s.ownedEvent(w, r)
-	if e == nil {
+	_, e, err := s.ownedEvent(r)
+	if err != nil {
 		return err
 	}
 	if err := s.store.DeleteEvent(r.Context(), e.ID); err != nil {
@@ -120,17 +116,20 @@ func (s *Server) deleteEvent(w http.ResponseWriter, r *http.Request) error {
 	return redirect(w, r, "/")
 }
 
+// interest records the visitor's state for an event. The first press from a
+// device without a session starts its anonymous account (after the event and
+// the state have been validated, so a 404 or 400 creates nothing).
 func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
-	acct := accountFrom(r)
-	if acct == nil {
-		return s.loginRedirect(w, r)
-	}
 	slug := r.PathValue("slug")
 	state := r.PostFormValue("state")
 	if state != store.Interested && state != store.NotInterested && state != "clear" {
 		return errBadRequest
 	}
-	e, err := s.store.EventBySlug(r.Context(), slug, acct.ID)
+	e, err := s.store.EventBySlug(r.Context(), slug, viewerID(accountFrom(r)))
+	if err != nil {
+		return err
+	}
+	acct, err := s.ensureAccount(w, r)
 	if err != nil {
 		return err
 	}
@@ -142,52 +141,47 @@ func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	back := "/e/" + slug
-	if b := r.PostFormValue("back"); b != "" && safeNext(b) == b {
-		back = b
-	}
-	return redirect(w, r, back)
+	return redirect(w, r, backOr(r, "/e/"+slug))
 }
 
+// follow toggles a tag or curator follow. Like interest, it starts the
+// visitor's account lazily, only once the target is known to exist.
 func (s *Server) follow(w http.ResponseWriter, r *http.Request) error {
-	acct := accountFrom(r)
-	if acct == nil {
-		return s.loginRedirect(w, r)
-	}
 	kind, key, on := r.PostFormValue("kind"), r.PostFormValue("key"), r.PostFormValue("on")
 	if on != "1" && on != "0" {
 		return errBadRequest
 	}
-	var err error
+	var poster *store.Account
 	switch kind {
 	case "tag":
 		if !validTag(key) {
 			return errNotFound
 		}
-		if on == "1" {
-			err = s.store.FollowTag(r.Context(), acct.ID, key)
-		} else {
-			err = s.store.UnfollowTag(r.Context(), acct.ID, key)
-		}
 	case "poster":
-		p, perr := s.store.PosterBySlug(r.Context(), key)
-		if perr != nil {
-			return perr
+		p, err := s.store.PosterBySlug(r.Context(), key)
+		if err != nil {
+			return err
 		}
-		if on == "1" {
-			err = s.store.FollowPoster(r.Context(), acct.ID, p.ID)
-		} else {
-			err = s.store.UnfollowPoster(r.Context(), acct.ID, p.ID)
-		}
+		poster = p
 	default:
 		return errBadRequest
+	}
+	acct, err := s.ensureAccount(w, r)
+	if err != nil {
+		return err
+	}
+	switch {
+	case poster == nil && on == "1":
+		err = s.store.FollowTag(r.Context(), acct.ID, key)
+	case poster == nil:
+		err = s.store.UnfollowTag(r.Context(), acct.ID, key)
+	case on == "1":
+		err = s.store.FollowPoster(r.Context(), acct.ID, poster.ID)
+	default:
+		err = s.store.UnfollowPoster(r.Context(), acct.ID, poster.ID)
 	}
 	if err != nil {
 		return err
 	}
-	back := "/"
-	if b := r.PostFormValue("back"); b != "" && safeNext(b) == b {
-		back = b
-	}
-	return redirect(w, r, back)
+	return redirect(w, r, backOr(r, "/"))
 }

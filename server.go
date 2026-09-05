@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"dside.studio/events/internal/mail"
 	"dside.studio/events/internal/store"
 )
 
@@ -17,7 +16,6 @@ import (
 type Server struct {
 	cfg     Config
 	store   *store.Store
-	mail    mail.Sender
 	loc     *time.Location
 	version string
 	pages   map[string]*template.Template
@@ -25,8 +23,8 @@ type Server struct {
 	icons   map[string][]byte // "/icon-192.png" -> PNG bytes
 }
 
-func newServer(cfg Config, st *store.Store, sender mail.Sender, loc *time.Location) (*Server, error) {
-	s := &Server{cfg: cfg, store: st, mail: sender, loc: loc, version: time.Now().UTC().Format("20060102150405")}
+func newServer(cfg Config, st *store.Store, loc *time.Location) (*Server, error) {
+	s := &Server{cfg: cfg, store: st, loc: loc, version: time.Now().UTC().Format("20060102150405")}
 	pages, err := parseTemplates(s.funcs())
 	if err != nil {
 		return nil, err
@@ -56,13 +54,11 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /new", h(s.newForm))
 	mux.HandleFunc("POST /new", h(s.newSubmit))
 
-	mux.HandleFunc("GET /login", h(s.loginForm))
-	mux.HandleFunc("POST /login", h(s.loginSubmit))
-	mux.HandleFunc("GET /login/code", h(s.codeForm))
-	mux.HandleFunc("POST /login/code", h(s.codeSubmit))
-	mux.HandleFunc("POST /logout", h(s.logout))
+	mux.HandleFunc("GET /k/{key}", h(s.secretLink))
 	mux.HandleFunc("GET /account", h(s.account))
+	mux.HandleFunc("POST /account/key", h(s.accountKey))
 	mux.HandleFunc("POST /account/delete", h(s.accountDelete))
+	mux.HandleFunc("POST /forget", h(s.forget))
 
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /static/", s.static)

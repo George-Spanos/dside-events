@@ -1,8 +1,9 @@
 // Package e2e is the black-box end-to-end suite for dside-events.
 //
-// It builds the real binary, seeds two curators with `add-poster`, starts
-// `serve` on a random port and drives it over plain HTTP exactly the way a
-// browser without JavaScript would. Nothing in here imports the server.
+// It builds the real binary, starts `serve` on a random port, seeds two
+// curators with `add-poster` (which prints their secret login links) and
+// drives the server over plain HTTP exactly the way a browser without
+// JavaScript would. Nothing in here imports the server.
 //
 // Every test carries a `// spec: Name[, Name…]` header naming the rules,
 // surfaces and invariants of spec/dside-events.allium it exercises.
@@ -18,9 +19,10 @@ import (
 	_ "time/tzdata" // Europe/Athens must resolve even on hosts without tzdata.
 )
 
-// poster is a curator seeded through the CLI.
+// poster is a curator seeded through the CLI. Link is the secret login link
+// `add-poster` printed (`<BASE_URL>/k/<key>`); Key is its 43-character key.
 type poster struct {
-	Email, Name, Slug string
+	Name, Slug, Link, Key string
 }
 
 var (
@@ -57,23 +59,22 @@ func runSuite(m *testing.M) (int, error) {
 		return 1, err
 	}
 
-	sharedDir := filepath.Join(dir, "shared")
-	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
-		return 1, err
-	}
-	dbPath := filepath.Join(sharedDir, "events.db")
-	if poster1, err = runAddPoster(dbPath, "poster1@example.test", "Maria P."); err != nil {
-		return 1, err
-	}
-	if poster2, err = runAddPoster(dbPath, "poster2@example.test", "Nikos K."); err != nil {
-		return 1, err
-	}
-
-	s, err := launchServer(sharedDir, nil)
+	// The server starts first: add-poster prints links against BASE_URL, and
+	// those links must open on the running server.
+	s, err := launchServer(filepath.Join(dir, "shared"))
 	if err != nil {
 		return 1, err
 	}
 	shared = s
+	if poster1, err = runAddPoster(s, "Maria P.", ""); err != nil {
+		s.stop()
+		return 1, err
+	}
+	if poster2, err = runAddPoster(s, "Nikos K.", ""); err != nil {
+		s.stop()
+		return 1, err
+	}
+
 	code := m.Run()
 	s.stop()
 	if code != 0 {
