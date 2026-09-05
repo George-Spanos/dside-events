@@ -1,0 +1,13 @@
+{{define "title"}}Enter code · dside events{{end}}
+{{define "content"}}
+<h1>Enter code</h1>
+{{if .Error}}<p class="error" role="alert" id="code-err">{{.Error}}</p>{{end}}
+<p>We sent a six-digit code to {{.Email}}. It works for {{.TTL}}.</p>
+<form method="post" action="/login/code">
+  <input type="hidden" name="next" value="{{.Next}}">
+  <label for="code">Code</label>
+  <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus{{if .Error}} aria-invalid="true" aria-describedby="code-err"{{end}}>
+  <button>Log in</button>
+</form>
+<p><a href="/login{{with .Next}}?next={{.}}{{end}}">Use a different email</a></p>
+{{end}}

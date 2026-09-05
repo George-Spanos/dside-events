@@ -1,0 +1,34 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{block "title" .}}dside events{{end}}</title>
+<link rel="stylesheet" href="/static/style.css?v={{.Version}}">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+<script src="/static/app.js?v={{.Version}}" defer></script>
+</head>
+<body>
+<header>
+  {{if or (eq .Path "/") (eq .Path "/following")}}<h1>dside events</h1>{{else}}<p class="brand"><a href="/">dside events</a></p>{{end}}
+  <nav aria-label="Account">
+    {{with .Account}}
+      {{if eq $.Path "/mine"}}<strong aria-current="page">mine</strong>{{else}}<a href="/mine">mine</a>{{end}} ·
+      {{if eq $.Path "/account"}}<strong aria-current="page">account</strong>{{else}}<a href="/account">account</a>{{end}}
+      {{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page">new</strong>{{else}}<a href="/new">new</a>{{end}}{{end}}
+    {{else}}
+      <a href="/mine">mine</a> · <a href="/login">login</a>
+    {{end}}
+  </nav>
+</header>
+<main>
+{{template "content" .}}
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,17 @@
+{{define "title"}}{{if eq .Status 404}}Page not found{{else if eq .Status 403}}Not allowed{{else}}Error{{end}} · dside events{{end}}
+{{define "content"}}
+{{if eq .Status 404}}
+<h1>Page not found</h1>
+<p>There's nothing at this address. It may have been removed, or the link was mistyped.</p>
+{{else if eq .Status 403}}
+<h1>Not allowed</h1>
+<p>{{if .Message}}{{.Message}}{{else}}Your account can't do that.{{end}}</p>
+{{else if eq .Status 400}}
+<h1>Bad request</h1>
+<p>That request didn't make sense to us.</p>
+{{else}}
+<h1>Something broke on our side</h1>
+<p>Try again in a minute. If it keeps happening, tell us.</p>
+{{end}}
+<p><a href="/">Back to events</a></p>
+{{end}}

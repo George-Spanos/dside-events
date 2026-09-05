@@ -1,0 +1,65 @@
+{{define "title"}}{{if .Edit}}Edit event{{else}}New event{{end}} · dside events{{end}}
+{{define "content"}}
+<h1>{{if .Edit}}Edit event{{else}}New event{{end}}</h1>
+{{if .Edit}}<p class="muted">Web address stays /e/{{.Slug}}.</p>{{end}}
+{{template "errorsummary" .}}
+{{$f := .Form}}
+<form method="post" action="{{if .Edit}}/e/{{.Slug}}/edit{{else}}/new{{end}}">
+  <label for="title">Title</label>
+  <input id="title" name="title" maxlength="120" required value="{{$f.Title}}"{{with index $f.Errors "title"}} aria-invalid="true" aria-describedby="title-err"{{end}}>
+  {{with index $f.Errors "title"}}<p class="error" id="title-err">{{.}}</p>{{end}}
+
+  <div class="row">
+    <div>
+      <label for="date">Date</label>
+      <input id="date" name="date" type="date" required value="{{$f.Date}}"{{with index $f.Errors "date"}} aria-invalid="true" aria-describedby="date-err"{{end}}>
+      {{with index $f.Errors "date"}}<p class="error" id="date-err">{{.}}</p>{{end}}
+    </div>
+    <div>
+      <label for="time">Start time</label>
+      <input id="time" name="time" type="time" required value="{{$f.Time}}"{{with index $f.Errors "time"}} aria-invalid="true" aria-describedby="time-err"{{end}}>
+      {{with index $f.Errors "time"}}<p class="error" id="time-err">{{.}}</p>{{end}}
+    </div>
+  </div>
+
+  <label for="venue">Venue</label>
+  <input id="venue" name="venue" maxlength="120" required value="{{$f.Venue}}"{{with index $f.Errors "venue"}} aria-invalid="true" aria-describedby="venue-err"{{end}}>
+  {{with index $f.Errors "venue"}}<p class="error" id="venue-err">{{.}}</p>{{end}}
+
+  <label for="price">Price</label>
+  <input id="price" name="price" maxlength="60" value="{{$f.Price}}" aria-describedby="price-hint{{with index $f.Errors "price"}} price-err{{end}}"{{with index $f.Errors "price"}} aria-invalid="true"{{end}}>
+  <p class="hint" id="price-hint">Free, €10, or €8–12. Leave empty if unknown.</p>
+  {{with index $f.Errors "price"}}<p class="error" id="price-err">{{.}}</p>{{end}}
+
+  <fieldset id="tags"{{with index $f.Errors "tags"}} aria-describedby="tags-err"{{end}}>
+    <legend>Tags — pick at least one</legend>
+    {{range .Tags}}<label class="check"><input type="checkbox" name="tag" value="{{.}}"{{if tagChecked $f.TagSet .}} checked{{end}}> {{.}}</label>
+    {{end}}
+    {{with index $f.Errors "tags"}}<p class="error" id="tags-err">{{.}}</p>{{end}}
+  </fieldset>
+
+  <fieldset>
+    <legend>Links (optional)</legend>
+    {{range $i, $l := $f.Links}}{{$n := inc $i}}
+    <div class="row">
+      <div>
+        <label for="link_label_{{$n}}">Link {{$n}} label</label>
+        <input id="link_label_{{$n}}" name="link_label_{{$n}}" maxlength="80" value="{{$l.Label}}">
+      </div>
+      <div>
+        <label for="link_url_{{$n}}">Link {{$n}} address</label>
+        <input id="link_url_{{$n}}" name="link_url_{{$n}}" type="url" placeholder="https://" value="{{$l.URL}}"{{with index $f.Errors (printf "link_url_%d" $n)}} aria-invalid="true" aria-describedby="link_url_{{$n}}-err"{{end}}>
+        {{with index $f.Errors (printf "link_url_%d" $n)}}<p class="error" id="link_url_{{$n}}-err">{{.}}</p>{{end}}
+      </div>
+    </div>
+    {{end}}
+  </fieldset>
+
+  <label for="description">Description</label>
+  <textarea id="description" name="description" maxlength="4000" aria-describedby="description-hint{{with index $f.Errors "description"}} description-err{{end}}"{{with index $f.Errors "description"}} aria-invalid="true"{{end}}>{{$f.Description}}</textarea>
+  <p class="hint" id="description-hint">Plain text. A blank line starts a new paragraph.</p>
+  {{with index $f.Errors "description"}}<p class="error" id="description-err">{{.}}</p>{{end}}
+
+  <button>{{if .Edit}}Save changes{{else}}Publish event{{end}}</button> <a href="{{.Cancel}}">Cancel</a>
+</form>
+{{end}}

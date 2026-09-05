@@ -1,0 +1,25 @@
+{{define "daylist"}}
+{{range .Days}}
+{{if $.Sub}}<h3>{{if .Label}}{{.Label}} · {{end}}{{day .Date}}</h3>{{else}}<h2>{{if .Label}}{{.Label}} · {{end}}{{day .Date}}</h2>{{end}}
+<ul class="events">
+  {{range .Events}}
+  <li>
+    <time datetime="{{iso .Start}}">{{clock .Start}}</time>
+    <div>
+      <a href="/e/{{.Slug}}">{{.Title}}</a><br>
+      <small>{{.Venue}}{{with .Price}} · {{.}}{{end}}{{if .Interested}} · {{.Interested}} interested{{end}}</small>
+      {{with .Interest}}{{template "interest" .}}{{end}}
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}
+
+{{define "pastlist"}}
+<ul class="past">
+  {{range .}}
+  <li><a href="/e/{{.Slug}}">{{.Title}}</a> <small>· <time datetime="{{iso .Start}}">{{day .Start}}</time> · {{.Venue}}{{if .Interested}} · {{.Interested}} were interested{{end}}</small></li>
+  {{end}}
+</ul>
+{{end}}

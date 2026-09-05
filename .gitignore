@@ -1,0 +1,8 @@
+.allium-loop/
+bin/
+*.db
+*.db-wal
+*.db-shm
+otp.log
+/events
+/dside-events

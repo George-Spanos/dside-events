@@ -1,0 +1,8 @@
+{{define "errorsummary"}}
+{{if .Form.List}}
+<div role="alert" class="errors">
+  <p><strong>{{if .Edit}}Couldn't save yet.{{else}}Couldn't publish yet.{{end}} Fix the fields below.</strong></p>
+  <ul>{{range .Form.List}}<li><a href="#{{.Field}}">{{.Msg}}</a></li>{{end}}</ul>
+</div>
+{{end}}
+{{end}}

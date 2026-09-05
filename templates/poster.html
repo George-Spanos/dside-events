@@ -1,0 +1,17 @@
+{{define "title"}}{{.Poster.Name}} · dside events{{end}}
+{{define "content"}}
+<h1>{{.Poster.Name}}</h1>
+{{with .Follow}}
+<form method="post" action="/follow" data-toggle class="inline">
+  <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="key" value="{{.Key}}">
+  <input type="hidden" name="back" value="{{.Back}}">
+  <button name="on" value="{{if .Following}}0{{else}}1{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}">Follow {{.Label}}</button>
+</form>
+{{end}}
+{{if .Anon}}<p><a href="/login?next=/p/{{.Poster.Slug}}">Log in to follow {{.Poster.Name}}</a></p>{{end}}
+{{if .Upcoming.Days}}{{template "daylist" .Upcoming}}{{else}}<p>No upcoming events from {{.Poster.Name}}.</p>{{end}}
+{{with .Past}}
+<h2>Past</h2>
+{{template "pastlist" .}}
+{{end}}
+{{end}}

@@ -1,0 +1,46 @@
+{{define "title"}}Account · dside events{{end}}
+{{define "content"}}
+<h1>Account</h1>
+<form method="post" action="/logout">{{.Email}} · {{if .Poster}}curator{{else}}user{{end}} <button>Log out</button></form>
+{{if .Poster}}<p>Your curator page: <a href="/p/{{.Slug}}">/p/{{.Slug}}</a>.</p>{{end}}
+
+<h2>Following</h2>
+<h3>Tags</h3>
+<div class="tagfollows">
+{{range .Tags}}
+<form class="inline" method="post" action="/follow" data-toggle>
+  <input type="hidden" name="kind" value="tag"><input type="hidden" name="key" value="{{.Tag}}">
+  <input type="hidden" name="back" value="/account">
+  <button name="on" value="{{if .Following}}0{{else}}1{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}">Follow {{.Tag}}</button>
+</form>
+{{end}}
+</div>
+<h3>Curators</h3>
+{{if .Posters}}
+<ul class="curators">
+{{range .Posters}}
+  <li><a href="/p/{{.Slug}}">{{.Name}}</a>
+    <form class="inline" method="post" action="/follow">
+      <input type="hidden" name="kind" value="poster"><input type="hidden" name="key" value="{{.Slug}}">
+      <input type="hidden" name="back" value="/account">
+      <button name="on" value="0">Unfollow</button>
+    </form>
+  </li>
+{{end}}
+</ul>
+{{else}}
+<p class="muted">You're not following any curators yet. Follow one from an event page.</p>
+{{end}}
+
+<h2>Delete account</h2>
+{{if .Poster}}
+<p>Curator accounts are removed by hand. Ask us.</p>
+{{else}}
+{{if .Error}}<p class="error" role="alert" id="confirm-err">{{.Error}}</p>{{end}}
+<p>Deletes your account, your follows and your interested marks. It can't be undone.</p>
+<form method="post" action="/account/delete">
+  <label class="check"><input type="checkbox" name="confirm" value="1" required{{if .Error}} aria-invalid="true" aria-describedby="confirm-err"{{end}}> I understand</label>
+  <button>Delete my account</button>
+</form>
+{{end}}
+{{end}}

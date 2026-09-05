@@ -1,0 +1,14 @@
+{{define "title"}}{{if eq .Path "/"}}dside events{{else}}Following · dside events{{end}}{{end}}
+{{define "content"}}
+<nav class="filters" aria-label="Filter events">
+  {{range $i, $f := .Filters}}{{if $i}} · {{end}}{{if $f.Active}}<strong aria-current="page">{{$f.Label}}</strong>{{else}}<a href="{{$f.Href}}">{{$f.Label}}</a>{{end}}{{end}}
+</nav>
+{{with .TagFollow}}
+<form method="post" action="/follow" data-toggle class="inline">
+  <input type="hidden" name="kind" value="tag"><input type="hidden" name="key" value="{{.Tag}}">
+  <input type="hidden" name="back" value="{{.Back}}">
+  <button name="on" value="{{if .Following}}0{{else}}1{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}">Follow {{.Tag}}</button>
+</form>
+{{end}}
+{{if .List.Days}}{{template "daylist" .List}}{{else}}<p>{{.Empty}}</p>{{end}}
+{{end}}

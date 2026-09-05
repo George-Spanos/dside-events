@@ -1,0 +1,20 @@
+{{define "title"}}{{.Event.Title}} · dside events{{end}}
+{{define "content"}}
+<h1>{{.Event.Title}}</h1>
+<p>
+  <time datetime="{{iso .Event.Start}}">{{with dayLabel .Event.Start}}{{.}} · {{end}}{{day .Event.Start}}, {{clock .Event.Start}}</time><br>
+  {{.Event.Venue}}<br>
+  {{range $i, $t := .Event.Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}
+  {{with .Event.Price}}<br>{{.}}{{end}}
+</p>
+{{if .Event.Past}}<p class="muted">This event has passed.</p>{{end}}
+{{template "interest" .Interest}}
+{{with .Event.Links}}<ul class="links">{{range .}}<li><a href="{{.URL}}" rel="noopener">{{.Label}}<span aria-hidden="true"> ↗</span></a></li>{{end}}</ul>{{end}}
+{{with paragraphs .Event.Description}}<div class="desc">{{range .}}<p>{{.}}</p>{{end}}</div>{{end}}
+<hr>
+<p>Posted by <a href="/p/{{.Event.Poster.Slug}}">{{.Event.Poster.Name}}</a>{{if .CanEdit}} · <a href="/e/{{.Event.Slug}}/edit">Edit event</a>{{end}}</p>
+{{if .CanEdit}}<form method="post" action="/e/{{.Event.Slug}}/delete">
+  <label class="check"><input type="checkbox" name="confirm" value="1" required> I understand this can't be undone</label>
+  <button>Delete event</button>
+</form>{{end}}
+{{end}}

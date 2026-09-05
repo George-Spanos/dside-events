@@ -1,0 +1,1024 @@
+-- allium: 3
+-- dside-events: event discovery for Athens. Text-only events posted by
+-- whitelisted curators ("posters"); attendees log in with an email one-time
+-- code, mark interest, and follow tags or posters. Anonymous visitors browse.
+-- Source of truth for product intent: PROJECT.md.
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- Anyone reaching the public boundary without a session. Governed by the
+-- browser and the network, not by this specification.
+external entity Visitor {}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value Link {
+    url: String               -- absolute http or https URL
+    label: String?            -- shown instead of the URL when present
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum Role { user | poster }
+
+enum InterestState { interested | not_interested }
+
+enum Tag { concert | theater | film | exhibition | talk | party | dance | workshop | other }
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+entity Account {
+    -- Fields
+    email: String                           -- normalised: trimmed, lower-case
+    role: Role
+    name: String when role = poster         -- public curator name, the trust signal
+    slug: String when role = poster         -- public curator identifier
+    created_at: Timestamp
+
+    transitions role {
+        user -> poster
+        terminal: poster
+    }
+
+    -- Relationships
+    sessions: Session with account = this
+    events: Event with poster = this
+    interests: Interest with account = this
+    tag_follows: TagFollow with follower = this
+    poster_follows: PosterFollow with follower = this
+
+    -- Projections
+    active_sessions: sessions where status = active
+    interested_events: interests where state = interested -> event
+    hidden_events: interests where state = not_interested -> event
+
+    -- Derived
+    is_poster: role = poster
+}
+
+entity OtpCode {
+    -- Fields
+    email: String                           -- normalised, same form as Account.email
+    code: String                            -- config.otp_length decimal digits
+    attempts: Integer                       -- wrong guesses so far
+    status: pending | used | expired | exhausted | superseded
+    created_at: Timestamp
+    expires_at: Timestamp
+
+    transitions status {
+        pending -> used
+        pending -> expired
+        pending -> exhausted
+        pending -> superseded
+        terminal: used, expired, exhausted, superseded
+    }
+
+    -- Derived
+    is_valid: status = pending and expires_at > now
+}
+
+entity Session {
+    -- Fields
+    account: Account
+    status: active | expired
+    created_at: Timestamp
+    expires_at: Timestamp
+
+    transitions status {
+        active -> expired
+        terminal: expired
+    }
+}
+
+entity Event {
+    -- Fields
+    poster: Account
+    slug: String                            -- immutable public identifier, unique across all events
+    title: String
+    description: String                     -- plain text
+    starts_at: Timestamp                    -- a moment; displayed in Europe/Athens
+    venue: String
+    price: String?                          -- free text such as "10 EUR" or "free"
+    tags: Set<Tag>
+    links: List<Link>
+    created_at: Timestamp
+    updated_at: Timestamp
+
+    -- Relationships
+    interests: Interest with event = this
+
+    -- Projections
+    interested_by: interests where state = interested
+
+    -- Derived
+    interested_count: interested_by.count
+    is_upcoming: starts_at >= athens_day_start(now)    -- black box: midnight in Europe/Athens of the current day
+
+    invariant PostedByPoster {
+        poster.is_poster
+    }
+}
+
+entity Interest {
+    -- Fields
+    account: Account
+    event: Event
+    state: InterestState
+    updated_at: Timestamp
+}
+
+entity TagFollow {
+    -- Fields
+    follower: Account
+    tag: Tag
+    created_at: Timestamp
+}
+
+entity PosterFollow {
+    -- Fields
+    follower: Account
+    poster: Account
+    created_at: Timestamp
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    otp_ttl: Duration = 10.minutes
+    otp_max_attempts: Integer = 5
+    otp_length: Integer = 6
+    otp_rate_limit: Integer = 3             -- codes per email per otp_rate_window
+    otp_rate_window: Duration = 15.minutes
+    session_duration: Duration = 90.days
+    max_tags: Integer = 4
+    max_links: Integer = 5
+    max_title_length: Integer = 120
+    max_description_length: Integer = 4000
+    max_venue_length: Integer = 120
+    max_price_length: Integer = 60
+    max_past_start: Duration = 1.year       -- how far in the past an event may start
+    max_future_start: Duration = 3.years    -- how far in the future an event may start
+    max_link_url_length: Integer = 500
+    max_link_label_length: Integer = 80
+    feed_limit: Integer = 500               -- most rows any feed view renders
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Authentication ------------------------------------------
+
+rule RequestCode {
+    when: RequestCode(email)
+    let normalised = normalise_email(email)                  -- black box: trim, lower-case
+    requires: valid_email(normalised)                        -- black box: syntactic email check
+    let recent = OtpCodes where email = normalised and created_at > now - config.otp_rate_window
+    requires: recent.count < config.otp_rate_limit
+    let pending = OtpCodes where email = normalised and status = pending
+    ensures:
+        for c in pending:
+            c.status = superseded
+    ensures:
+        let otp = OtpCode.created(
+            email: normalised,
+            code: random_digits(config.otp_length),          -- black box: uniformly random digit string
+            attempts: 0,
+            status: pending,
+            created_at: now,
+            expires_at: now + config.otp_ttl
+        )
+        CodeDelivered(email: normalised, code: otp.code)
+    @guidance
+        -- HTTP: POST /login with fields email and next. Success answers 303 to
+        -- /login/code?next=... and sets a short-lived otp_email cookie scoped to
+        -- /login so the code step knows which email is being verified.
+        -- Invalid email or rate limit exceeded answer 422 re-rendering the form.
+        -- Unknown emails are accepted; the account is created on first
+        -- successful verification. CodeDelivered is carried by SMTP when
+        -- configured, otherwise appended to the DEV_OTP_FILE for local use.
+}
+
+rule VerifyCodeNewAccount {
+    when: VerifyCode(email, code)
+    let normalised = normalise_email(email)
+    let otp = OtpCode{email: normalised, status: pending}
+    requires: exists otp
+    requires: otp.is_valid
+    requires: otp.code = code
+    requires: not exists Account{email: normalised}
+    ensures: otp.status = used
+    ensures:
+        let account = Account.created(email: normalised, role: user, created_at: now)
+        Session.created(account: account, status: active, created_at: now, expires_at: now + config.session_duration)
+    @guidance
+        -- HTTP: POST /login/code with fields code and next. Success sets the
+        -- session cookie (HttpOnly, SameSite=Lax, Secure when configured),
+        -- clears the otp_email cookie and answers 303 to next when next is a
+        -- local path, otherwise to /.
+}
+
+rule VerifyCodeExistingAccount {
+    when: VerifyCode(email, code)
+    let normalised = normalise_email(email)
+    let otp = OtpCode{email: normalised, status: pending}
+    let account = Account{email: normalised}
+    requires: exists otp
+    requires: otp.is_valid
+    requires: otp.code = code
+    requires: exists account
+    ensures: otp.status = used
+    ensures: Session.created(account: account, status: active, created_at: now, expires_at: now + config.session_duration)
+    @guidance
+        -- Same HTTP behaviour as VerifyCodeNewAccount. Posters log in through
+        -- exactly this flow; the role is read from the existing account.
+}
+
+rule VerifyCodeWrong {
+    when: VerifyCode(email, code)
+    let normalised = normalise_email(email)
+    let otp = OtpCode{email: normalised, status: pending}
+    requires: exists otp
+    requires: otp.is_valid
+    requires: otp.code != code
+    ensures: otp.attempts = otp.attempts + 1
+    ensures:
+        if otp.attempts >= config.otp_max_attempts:
+            otp.status = exhausted
+    @guidance
+        -- HTTP: 422 re-rendering the code form. The message distinguishes a
+        -- wrong code from an exhausted or expired one ("request a new code");
+        -- a VerifyCode with no valid pending code fires no rule and also
+        -- answers 422. No session cookie is ever set on these paths.
+}
+
+rule CodeExpires {
+    when: otp: OtpCode.expires_at <= now
+    requires: otp.status = pending
+    ensures: otp.status = expired
+}
+
+rule Logout {
+    when: Logout(session)
+    requires: session.status = active
+    ensures: not exists session
+    @guidance
+        -- HTTP: POST /logout removes the session row named by the cookie and
+        -- clears the cookie, then 303 to /. GET /logout answers 405.
+}
+
+rule SessionExpires {
+    when: session: Session.expires_at <= now
+    requires: session.status = active
+    ensures: session.status = expired
+    @guidance
+        -- An expired session is indistinguishable from a missing one at the
+        -- boundary; the implementation may delete the row instead of keeping it.
+}
+
+-- Curator onboarding (operator CLI, no web surface) ------
+
+rule AddPoster {
+    when: AddPoster(email, name, slug?)
+    let normalised = normalise_email(email)
+    requires: valid_email(normalised)
+    requires: not exists Account{email: normalised}
+    ensures: Account.created(
+        email: normalised,
+        role: poster,
+        name: name,
+        slug: slug ?? poster_slug(name),                     -- black box: ASCII slug from the name
+        created_at: now
+    )
+    @guidance
+        -- CLI: dside-events add-poster -email x -name y [-slug z]. Prints
+        -- "poster <slug> <email>". Works while the server runs. Re-running for
+        -- an email that is already a poster fires no rule and is a no-op that
+        -- prints the existing slug.
+}
+
+rule PromoteToPoster {
+    when: AddPoster(email, name, slug?)
+    let normalised = normalise_email(email)
+    let account = Account{email: normalised}
+    requires: exists account
+    requires: account.role = user
+    ensures: account.role = poster
+    ensures: account.name = name
+    ensures: account.slug = slug ?? poster_slug(name)
+    @guidance
+        -- Existing sessions, interests and follows are kept; the next request
+        -- with the same session cookie already sees poster capabilities.
+}
+
+-- Events --------------------------------------------------
+
+rule CreateEvent {
+    when: CreateEvent(poster, title, starts_at, venue, price?, description, tags, links)
+    requires: poster.is_poster
+    requires: length(title) >= 1 and length(title) <= config.max_title_length
+    requires: length(venue) >= 1 and length(venue) <= config.max_venue_length
+    requires: price = null or length(price) <= config.max_price_length
+    requires: length(description) <= config.max_description_length
+    requires: starts_at >= now - config.max_past_start and starts_at <= now + config.max_future_start
+    requires: tags.count >= 1 and tags.count <= config.max_tags
+    requires: links.count <= config.max_links
+    requires: links.all(l => valid_http_url(l.url))          -- black box: http(s) scheme with a host
+    requires: links.all(l => length(l.url) <= config.max_link_url_length)
+    requires: links.all(l => l.label = null or length(l.label) <= config.max_link_label_length)
+    -- One post per event: no other event by this poster with the same normalised
+    -- title on the same Athens day.
+    requires: not poster.events.any(e =>
+        normalise_title(e.title) = normalise_title(title)    -- black box: trim, collapse spaces, case-fold
+        and athens_day(e.starts_at) = athens_day(starts_at)) -- black box: calendar day in Europe/Athens
+    ensures: Event.created(
+        poster: poster,
+        slug: unique_slug(title, starts_at),                 -- black box: transliterated title + Athens date suffix, made unique
+        title: title,
+        description: description,
+        starts_at: starts_at,
+        venue: venue,
+        price: price,
+        tags: tags,
+        links: links,
+        created_at: now,
+        updated_at: now
+    )
+    @guidance
+        -- HTTP: GET/POST /new for posters only (users 403, anonymous 303 to
+        -- /login?next=/new). Form fields title, date, time, venue, price, tag
+        -- (repeated), link_label_1..5, link_url_1..5, description; date and
+        -- time are read in Europe/Athens. A link without label defaults its
+        -- label to the URL host. Success 303 to /e/{slug}; any failed
+        -- requirement 422 re-rendering the form with the submitted values, the
+        -- duplicate case saying "already posted".
+}
+
+rule EditEvent {
+    when: EditEvent(poster, event, title, starts_at, venue, price?, description, tags, links)
+    requires: event.poster = poster
+    requires: length(title) >= 1 and length(title) <= config.max_title_length
+    requires: length(venue) >= 1 and length(venue) <= config.max_venue_length
+    requires: price = null or length(price) <= config.max_price_length
+    requires: length(description) <= config.max_description_length
+    requires: starts_at >= now - config.max_past_start and starts_at <= now + config.max_future_start
+    requires: tags.count >= 1 and tags.count <= config.max_tags
+    requires: links.count <= config.max_links
+    requires: links.all(l => valid_http_url(l.url))
+    requires: links.all(l => length(l.url) <= config.max_link_url_length)
+    requires: links.all(l => l.label = null or length(l.label) <= config.max_link_label_length)
+    requires: not poster.events.any(e =>
+        e != event
+        and normalise_title(e.title) = normalise_title(title)
+        and athens_day(e.starts_at) = athens_day(starts_at))
+    ensures: event.title = title
+    ensures: event.description = description
+    ensures: event.starts_at = starts_at
+    ensures: event.venue = venue
+    ensures: event.price = price
+    ensures: event.tags = tags
+    ensures: event.links = links
+    ensures: event.updated_at = now
+    ensures: event.slug = event.slug                         -- the slug never changes, even when title or date do
+    @guidance
+        -- HTTP: GET/POST /e/{slug}/edit, prefilled. Owner only: another poster
+        -- or a user gets 403, unknown slug 404. Success 303 to the same
+        -- /e/{slug}; failures 422 as for CreateEvent.
+}
+
+rule DeleteEvent {
+    when: DeleteEvent(poster, event)
+    requires: event.poster = poster
+    ensures:
+        for i in event.interests:
+            not exists i
+        not exists event
+    @guidance
+        -- HTTP: POST /e/{slug}/delete, owner only (403 otherwise), 303 to /.
+        -- Hard delete: the slug answers 404 afterwards and is never reused.
+}
+
+-- Interest ------------------------------------------------
+
+rule MarkInterested {
+    when: MarkInterested(account, event)
+    let existing = Interest{account, event}
+    ensures:
+        if exists existing:
+            existing.state = interested
+            existing.updated_at = now
+        else:
+            Interest.created(account: account, event: event, state: interested, updated_at: now)
+    @guidance
+        -- HTTP: POST /e/{slug}/interest with state=interested and back; 303 to
+        -- back when it is a local path, otherwise to /e/{slug}. Idempotent.
+        -- The interested count on an event is public.
+}
+
+rule MarkNotInterested {
+    when: MarkNotInterested(account, event)
+    let existing = Interest{account, event}
+    ensures:
+        if exists existing:
+            existing.state = not_interested
+            existing.updated_at = now
+        else:
+            Interest.created(account: account, event: event, state: not_interested, updated_at: now)
+    @guidance
+        -- HTTP: same endpoint with state=not_interested. Never expose a
+        -- not_interested mark to anyone but the owning account: not to other
+        -- users, not to the poster, and never in the public count.
+}
+
+rule ClearInterest {
+    when: ClearInterest(account, event)
+    let existing = Interest{account, event}
+    ensures: not exists existing
+    @guidance
+        -- HTTP: same endpoint with state=clear. Any other state value answers
+        -- 400; an unknown slug 404. Clearing when nothing is marked is a no-op.
+}
+
+-- Following -----------------------------------------------
+
+rule FollowTag {
+    when: FollowTag(account, tag)
+    let existing = TagFollow{follower: account, tag: tag}
+    ensures:
+        if not exists existing:
+            TagFollow.created(follower: account, tag: tag, created_at: now)
+    @guidance
+        -- HTTP: POST /follow with kind=tag, key=<tag>, on=1, back; 303 to back
+        -- when local, otherwise to /. A key outside the Tag enumeration
+        -- answers 404. Idempotent.
+}
+
+rule UnfollowTag {
+    when: UnfollowTag(account, tag)
+    ensures: not exists TagFollow{follower: account, tag: tag}
+    @guidance
+        -- HTTP: POST /follow with kind=tag, key=<tag>, on=0. Idempotent.
+}
+
+rule FollowPoster {
+    when: FollowPoster(account, target)
+    requires: target.is_poster
+    let existing = PosterFollow{follower: account, poster: target}
+    ensures:
+        if not exists existing:
+            PosterFollow.created(follower: account, poster: target, created_at: now)
+    @guidance
+        -- HTTP: POST /follow with kind=poster, key=<poster slug>, on=1. A key
+        -- that is not a poster slug answers 404. Idempotent.
+}
+
+rule UnfollowPoster {
+    when: UnfollowPoster(account, target)
+    ensures: not exists PosterFollow{follower: account, poster: target}
+    @guidance
+        -- HTTP: POST /follow with kind=poster, key=<poster slug>, on=0. Idempotent.
+}
+
+-- Account -------------------------------------------------
+
+rule DeleteAccount {
+    when: DeleteAccount(account)
+    requires: account.role = user
+    ensures:
+        for s in account.sessions:
+            not exists s
+        for i in account.interests:
+            not exists i
+        for f in account.tag_follows:
+            not exists f
+        for f in account.poster_follows:
+            not exists f
+        not exists account
+    @guidance
+        -- HTTP: POST /account/delete requires confirm=1 (otherwise 422); a
+        -- poster gets 403 with "Curator accounts are removed by hand"; success
+        -- clears the cookie and 303 to /. Interested counts on events drop
+        -- accordingly. A later login with the same email starts a fresh account.
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant UniqueAccountEmail {
+    for a in Accounts:
+        for b in Accounts:
+            a != b implies a.email != b.email
+}
+
+invariant PosterSlugsUnique {
+    for a in Accounts:
+        for b in Accounts:
+            a != b and a.role = poster and b.role = poster implies a.slug != b.slug
+}
+
+invariant OnePendingCodePerEmail {
+    for a in OtpCodes:
+        for b in OtpCodes:
+            a != b and a.status = pending and b.status = pending implies a.email != b.email
+}
+
+invariant SlugsUnique {
+    for a in Events:
+        for b in Events:
+            a != b implies a.slug != b.slug
+}
+
+invariant OneInterestPerAccountEvent {
+    for a in Interests:
+        for b in Interests:
+            a != b implies not (a.account = b.account and a.event = b.event)
+}
+
+invariant PosterFollowTargetsPoster {
+    for f in PosterFollows:
+        f.poster.is_poster
+}
+
+------------------------------------------------------------
+-- Actor Declarations
+------------------------------------------------------------
+
+actor AuthenticatedUser {
+    identified_by: Account where active_sessions.count > 0
+}
+
+actor Poster {
+    identified_by: Account where role = poster and active_sessions.count > 0
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+surface PublicFeed {
+    facing visitor: Visitor
+
+    let upcoming = Events where is_upcoming
+
+    exposes:
+        for e in upcoming:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+
+    related:
+        for e in upcoming:
+            EventDetail(e)
+
+    @guarantee UpcomingOnly
+        -- Only events on or after the current Athens day appear; past events
+        -- stay reachable through their own page but never through the feed.
+    @guarantee FilterableByTag
+        -- The feed can be narrowed to events carrying one tag from the Tag
+        -- enumeration. A tag outside the enumeration is not a feed at all.
+    @guidance
+        -- HTTP: GET / and GET /?tag={tag}; unknown tag 404. Events are grouped
+        -- by Athens day in ascending start order; an interested count of zero
+        -- is omitted from the row. At most config.feed_limit rows are rendered.
+        -- Filters are plain text links. Pages are served with Cache-Control:
+        -- no-store.
+
+}
+
+surface Feed {
+    facing user: AuthenticatedUser
+
+    -- Upcoming events minus the ones this account marked not_interested.
+    let visible = Events where is_upcoming
+        and not interests.any(i => i.account = user and i.state = not_interested)
+    -- The following view: visible events that carry a followed tag or come from a followed poster.
+    let following = visible where user.tag_follows.any(f => f.tag in tags)
+        or user.poster_follows.any(f => f.poster = poster)
+
+    exposes:
+        for e in visible:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+        for e in following:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+
+    provides:
+        FollowTag(user, tag)
+        UnfollowTag(user, tag)
+
+    related:
+        for e in visible:
+            EventDetailForUser(e)
+
+    @guarantee HiddenStaysHidden
+        -- An event the account marked not_interested appears in neither list
+        -- until the mark is cleared; nobody else can tell it was hidden.
+    @guarantee FollowingIsUnion
+        -- The following view uses OR semantics: a followed tag or a followed
+        -- poster is enough for an event to appear.
+    @guidance
+        -- HTTP: GET / and GET /?tag= render visible; GET /following renders
+        -- following, with an empty state that points to tags and posters to
+        -- follow. Anonymous GET /following answers 303 to /login?next=/following.
+        -- When a tag filter is active the follow or unfollow toggle for that
+        -- tag sits under the filter links. Each list renders at most
+        -- config.feed_limit rows.
+
+}
+
+surface EventDetail {
+    facing visitor: Visitor
+
+    context event: Event
+
+    exposes:
+        event.slug
+        event.title
+        event.starts_at
+        event.venue
+        event.price
+        event.tags
+        event.links
+        event.description
+        event.poster.name
+        event.poster.slug
+        event.interested_count
+        event.is_upcoming
+
+    related:
+        PosterPage(event.poster)
+
+    @guarantee SlugImmutable
+        -- The event URL never changes after creation, including across edits.
+    @guarantee PosterIsPublic
+        -- Every event page names the curator who posted it and links to
+        -- their page; the name is the trust signal.
+    @guidance
+        -- HTTP: GET /e/{slug}; unknown slug 404. A visitor sees the count with
+        -- "Nobody yet interested" at zero and a "Log in to mark interested"
+        -- link to /login?next=/e/{slug}. A past event shows "This event has
+        -- passed." Tags link to /?tag=, external links open the given URLs.
+
+}
+
+surface EventDetailForUser {
+    facing user: AuthenticatedUser
+
+    context event: Event
+
+    let mine = Interest{account: user, event: event}
+
+    exposes:
+        event.slug
+        event.title
+        event.starts_at
+        event.venue
+        event.price
+        event.tags
+        event.links
+        event.description
+        event.poster.name
+        event.poster.slug
+        event.interested_count
+        event.is_upcoming
+        mine.state when exists mine
+
+    provides:
+        MarkInterested(user, event)
+            when event.is_upcoming and (not exists mine or mine.state = not_interested)
+        MarkNotInterested(user, event)
+            when event.is_upcoming and (not exists mine or mine.state = interested)
+        ClearInterest(user, event)
+            when exists mine and event.is_upcoming
+        DeleteEvent(user, event)
+            when event.poster = user
+
+    related:
+        PosterPage(event.poster)
+        EventEditor(event)
+            when event.poster = user
+
+    @guarantee SlugImmutable
+        -- The event URL never changes after creation, including across edits.
+    @guarantee NotInterestedIsPrivate
+        -- The not_interested state is shown only to the account that set it,
+        -- as "Hidden from your feed." with a clear action; the public count
+        -- never includes it.
+    @guidance
+        -- HTTP: GET /e/{slug}. Two toggle buttons (interested, not interested)
+        -- post to /e/{slug}/interest with a hidden back field; a past event
+        -- shows "This event has passed." and no buttons. The owner sees an
+        -- Edit link and a Delete form. Toggles are plain forms that work
+        -- without script; script only replaces the form in place.
+
+}
+
+surface PosterPage {
+    facing visitor: Visitor
+
+    context curator: Account where role = poster
+
+    let upcoming = curator.events where is_upcoming
+    let past = curator.events where not is_upcoming
+
+    exposes:
+        curator.name
+        curator.slug
+        for e in upcoming:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+        for e in past:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+
+    related:
+        for e in upcoming:
+            EventDetail(e)
+        for e in past:
+            EventDetail(e)
+
+    @guidance
+        -- HTTP: GET /p/{slug}; a slug that is not a poster's answers 404.
+        -- Upcoming ascending, then Past descending. A visitor sees no follow
+        -- control.
+
+}
+
+surface PosterPageForUser {
+    facing user: AuthenticatedUser
+
+    context curator: Account where role = poster
+
+    let follow = PosterFollow{follower: user, poster: curator}
+    let upcoming = curator.events where is_upcoming
+    let past = curator.events where not is_upcoming
+
+    exposes:
+        curator.name
+        curator.slug
+        for e in upcoming:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+        for e in past:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+
+    provides:
+        FollowPoster(user, curator) when not exists follow and curator != user
+        UnfollowPoster(user, curator) when exists follow and curator != user
+
+    related:
+        for e in upcoming:
+            EventDetailForUser(e)
+        for e in past:
+            EventDetailForUser(e)
+
+    @guidance
+        -- HTTP: same page as PosterPage with a follow or unfollow toggle that
+        -- posts to /follow with kind=poster and key=<slug>.
+
+}
+
+surface MyEvents {
+    facing user: AuthenticatedUser
+
+    let upcoming = user.interested_events where is_upcoming
+    let past = user.interested_events where not is_upcoming
+    let hidden = user.hidden_events
+
+    exposes:
+        for e in upcoming:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+        for e in past:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+            e.price
+            e.interested_count
+        for e in hidden:
+            e.slug
+            e.title
+            e.starts_at
+            e.venue
+
+    provides:
+        for e in upcoming:
+            ClearInterest(user, e)
+        for e in hidden:
+            ClearInterest(user, e)
+
+    related:
+        for e in upcoming:
+            EventDetailForUser(e)
+        for e in past:
+            EventDetailForUser(e)
+        for e in hidden:
+            EventDetailForUser(e)
+
+    @guarantee UndoWithoutScript
+        -- A hidden event can always be restored from this page with a plain
+        -- form post, so not_interested is never a dead end.
+    @guidance
+        -- HTTP: GET /mine with sections Upcoming (ascending), Past (descending)
+        -- and Hidden (with a clear button each); upcoming rows carry an
+        -- Interested toggle that clears the mark. The Upcoming heading appears
+        -- only when at least one event is marked interested; the empty state
+        -- appears only when the account has no mark at all, neither interested
+        -- nor hidden. Anonymous 303 to /login?next=/mine.
+
+}
+
+surface Login {
+    facing visitor: Visitor
+
+    provides:
+        RequestCode(email)
+        VerifyCode(email, code)
+
+    @guarantee SafeRedirect
+        -- A post-login next target is honoured only when it is a same-site
+        -- path; anything else lands on the feed.
+    @guarantee WorksWithoutScript
+        -- Both steps are plain form posts answered with redirects.
+    @guarantee CrossSiteWritesRejected
+        -- The session cookie set here is SameSite=Lax, so a browser attaches it
+        -- to top-level navigations only. Every state-changing request (any
+        -- method other than GET or HEAD, on every surface) is refused when the
+        -- browser's Sec-Fetch-Site header says cross-site; when that header is
+        -- absent the Origin, else the Referer, must name this host. No per-form
+        -- token is used.
+    @guidance
+        -- HTTP: GET /login shows the email form with a hidden next; a
+        -- logged-in account is sent 303 to /. GET /login/code shows the code
+        -- form (numeric input, one-time-code autocomplete) and, without the
+        -- otp_email cookie, answers 303 to /login.
+}
+
+surface AccountPage {
+    facing user: AuthenticatedUser
+
+    exposes:
+        user.email
+        user.role
+        for f in user.tag_follows:
+            f.tag
+        for f in user.poster_follows:
+            f.poster.name
+            f.poster.slug
+
+    provides:
+        FollowTag(user, tag)
+        for f in user.tag_follows:
+            UnfollowTag(user, f.tag)
+        for f in user.poster_follows:
+            UnfollowPoster(user, f.poster)
+        for s in user.active_sessions:
+            Logout(s)
+        DeleteAccount(user) when not user.is_poster
+
+    @guarantee CuratorsRemovedByHand
+        -- A poster account cannot delete itself; the page says so instead of
+        -- offering the form.
+    @guidance
+        -- HTTP: GET /account. Follow buttons for every Tag literal not yet
+        -- followed, unfollow buttons next to followed tags and posters, a
+        -- logout form and (users only) a delete form with confirm=1. Logout
+        -- acts on the session carried by the request cookie. A poster sees a
+        -- link to their own curator page.
+}
+
+surface EventComposer {
+    facing curator: Poster
+
+    provides:
+        CreateEvent(curator, title, starts_at, venue, price?, description, tags, links)
+
+    @guarantee OnePostPerEvent
+        -- A second post with the same normalised title on the same Athens day
+        -- by the same curator is refused; editing is the only way to change a
+        -- posted event.
+    @guarantee TextOnly
+        -- Events carry no images or video; external material is reached only
+        -- through the links.
+    @guidance
+        -- HTTP: GET /new renders the form (visible labels, hints, an error
+        -- summary with anchors on 422); POST /new is described in CreateEvent.
+}
+
+surface EventEditor {
+    facing curator: Poster
+
+    context event: Event where poster = curator
+
+    exposes:
+        event.slug
+        event.title
+        event.starts_at
+        event.venue
+        event.price
+        event.tags
+        event.links
+        event.description
+
+    provides:
+        EditEvent(curator, event, title, starts_at, venue, price?, description, tags, links)
+        DeleteEvent(curator, event)
+
+    related:
+        EventDetailForUser(event)
+
+    @guarantee SlugImmutable
+        -- Saving the editor never changes the slug; the same URL keeps working.
+    @guidance
+        -- HTTP: GET/POST /e/{slug}/edit and POST /e/{slug}/delete, owner only.
+
+}
+
+surface PwaAssets {
+    facing visitor: Visitor
+
+    @guarantee Installable
+        -- Every HTML page declares a web app manifest, a viewport and a theme
+        -- colour and registers a service worker; the manifest names the app,
+        -- its start URL, display mode and icons, so browsers offer installation
+        -- and the app opens offline to an offline page.
+    @guarantee WorksWithoutScript
+        -- Every feature is reachable with script disabled: all mutations are
+        -- plain form posts answered with 303 redirects, and script only
+        -- enhances toggles in place.
+    @guidance
+        -- HTTP: GET /manifest.webmanifest (application/manifest+json), GET
+        -- /sw.js (text/javascript, no-cache), GET /icon.svg and
+        -- /icon-{180,192,512}.png, GET /offline, GET /static/* with long-lived
+        -- immutable caching under versioned URLs, GET /healthz answering
+        -- "ok" as text/plain. HTML is never cached by the service worker.
+        -- Unknown paths answer a 404 page; GET on a POST-only path answers 405.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "OQ-1 Tags: is the fixed MVP tag list exactly concert, theater, film, exhibition, talk, party, dance, workshop, other? (default: yes, this 9-tag set)"
+open question "OQ-2 Event fields: title, start date+time, venue (required), price (optional text), plain-text description, 1-4 tags, up to 5 labelled http(s) links, no end time and no media? (default: yes)"
+open question "OQ-3 One post per event: is a duplicate defined as same poster + same normalised title + same Athens day, refused as already posted? (default: yes)"
+open question "OQ-4 Past start dates: may a poster create or edit an event that already started? (default: yes, within one year back and three years ahead, for backfill)"
+open question "OQ-5 Interest: do interested and not_interested require login, is the interested count public, and is not_interested private to the account, hiding the event from feeds until cleared from the event page or the Hidden section of /mine? (default: yes to all)"
+open question "OQ-6 Delete account: is self-deletion limited to role user, cascading sessions, interests and follows, with curators removed by hand? (default: yes)"
+open question "OQ-7 Delete event: hard delete with cascade of interests and a slug that answers 404 forever? (default: yes)"
+open question "OQ-8 One-time codes: 6 digits, valid 10 minutes, 5 wrong attempts, a new request supersedes the pending code, at most 3 codes per email per 15 minutes? (default: yes)"
+open question "OQ-9 Sessions: fixed 90-day lifetime without sliding renewal, carried in an HttpOnly SameSite=Lax cookie? (default: yes)"
+-- OQ-10 (CSRF) resolved with its default: a same-site session cookie plus a
+-- fetch-metadata/origin check, no per-form token. See the Login surface's
+-- @guarantee CrossSiteWritesRejected.
+open question "OQ-11 Form convention: success 303, validation failure 422 re-render, anonymous on a user route 303 to login with next, wrong role 403, GET on a POST-only route 405? (default: yes)"
+open question "OQ-12 Time: store instants in UTC and treat every calendar boundary (feed start, duplicate check, slug date) in Europe/Athens? (default: yes)"
+open question "OQ-13 UI language and theme: English copy, automatic dark mode from the OS, no toggle? (default: yes)"
+open question "OQ-14 PWA icon: is a generated SVG/PNG icon the sole exception to no images? (default: yes)"
+open question "OQ-15 Packaging: single Go module dside.studio/events with SQLite as the only third-party dependency, deployed as a Docker image with a data volume? (default: yes)"
+open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their interest toggles)"

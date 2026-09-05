@@ -1,0 +1,337 @@
+package e2e
+
+import (
+	"html"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+)
+
+// client is one persona: its own cookie jar, no automatic redirects, no
+// JavaScript-ish headers. Every request is what a plain browser form would send.
+type client struct {
+	t    testing.TB
+	base *url.URL
+	hc   *http.Client
+	jar  *cookiejar.Jar
+}
+
+// resp is the part of an HTTP response the tests look at.
+type resp struct {
+	Status   int
+	Header   http.Header
+	Body     string
+	Location string
+}
+
+func newClient(t testing.TB, s *server) *client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := newClientWithJar(t, s, jar)
+	if s == shared {
+		t.Cleanup(func() {
+			if t.Failed() {
+				shared.dumpNewLogs(t)
+			}
+		})
+	}
+	return c
+}
+
+func newClientWithJar(t testing.TB, s *server, jar *cookiejar.Jar) *client {
+	t.Helper()
+	base, err := url.Parse(s.url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &client{
+		t:    t,
+		base: base,
+		jar:  jar,
+		hc: &http.Client{
+			Jar:     jar,
+			Timeout: 10 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+	}
+}
+
+// anon is a fresh visitor of the shared server.
+func anon(t testing.TB) *client {
+	t.Helper()
+	return newClient(t, shared)
+}
+
+func (c *client) abs(path string) string {
+	u, err := url.Parse(path)
+	if err != nil {
+		c.t.Fatalf("bad path %q: %v", path, err)
+	}
+	return c.base.ResolveReference(u).String()
+}
+
+func (c *client) do(req *http.Request) resp {
+	c.t.Helper()
+	res, err := c.hc.Do(req)
+	if err != nil {
+		c.t.Fatalf("%s %s: %v", req.Method, req.URL, err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		c.t.Fatalf("%s %s: read body: %v", req.Method, req.URL, err)
+	}
+	return resp{Status: res.StatusCode, Header: res.Header, Body: string(b), Location: res.Header.Get("Location")}
+}
+
+func (c *client) get(path string) resp {
+	c.t.Helper()
+	req, err := http.NewRequest(http.MethodGet, c.abs(path), nil)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	return c.do(req)
+}
+
+// postForm submits application/x-www-form-urlencoded, like a plain <form>.
+func (c *client) postForm(path string, form url.Values) resp {
+	c.t.Helper()
+	req, err := http.NewRequest(http.MethodPost, c.abs(path), strings.NewReader(form.Encode()))
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return c.do(req)
+}
+
+// follow performs the GET a browser would do after r's redirect.
+func (c *client) follow(r resp) resp {
+	c.t.Helper()
+	if r.Location == "" {
+		c.t.Fatalf("follow: response %d has no Location", r.Status)
+	}
+	return c.get(r.Location)
+}
+
+// cookie returns the named cookie as the jar would send it for "/" or
+// "/login", or nil.
+func (c *client) cookie(name string) *http.Cookie {
+	for _, p := range []string{"/", "/login", "/login/code"} {
+		u, _ := url.Parse(c.abs(p))
+		for _, ck := range c.jar.Cookies(u) {
+			if ck.Name == name {
+				return ck
+			}
+		}
+	}
+	return nil
+}
+
+// setRawCookie plants a cookie in the jar (e.g. a replayed session token).
+func (c *client) setRawCookie(name, value, path string) {
+	u, _ := url.Parse(c.abs(path))
+	c.jar.SetCookies(u, []*http.Cookie{{Name: name, Value: value, Path: path}})
+}
+
+// ---- assertions -----------------------------------------------------------
+
+var spaces = regexp.MustCompile(`\s+`)
+
+// snippet condenses a body for failure messages.
+func snippet(body string) string {
+	s := spaces.ReplaceAllString(body, " ")
+	if len(s) > 700 {
+		s = s[:700] + "…"
+	}
+	return s
+}
+
+func assertStatus(t testing.TB, r resp, want int) {
+	t.Helper()
+	if r.Status != want {
+		t.Fatalf("status = %d, want %d (Location=%q)\nbody: %s", r.Status, want, r.Location, snippet(r.Body))
+	}
+}
+
+// assertRedirect wants a 303 to exactly wantLocation.
+func assertRedirect(t testing.TB, r resp, wantLocation string) {
+	t.Helper()
+	if r.Status != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303 → %s\nbody: %s", r.Status, wantLocation, snippet(r.Body))
+	}
+	if r.Location != wantLocation {
+		t.Fatalf("Location = %q, want %q", r.Location, wantLocation)
+	}
+}
+
+// assertRedirectPrefix wants a 303 whose Location starts with prefix.
+func assertRedirectPrefix(t testing.TB, r resp, prefix string) {
+	t.Helper()
+	if r.Status != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303 → %s…\nbody: %s", r.Status, prefix, snippet(r.Body))
+	}
+	if !strings.HasPrefix(r.Location, prefix) {
+		t.Fatalf("Location = %q, want prefix %q", r.Location, prefix)
+	}
+}
+
+// assertRedirectPath wants a 303 whose Location path (ignoring the query)
+// is wantPath.
+func assertRedirectPath(t testing.TB, r resp, wantPath string) {
+	t.Helper()
+	if r.Status != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303 → %s\nbody: %s", r.Status, wantPath, snippet(r.Body))
+	}
+	u, err := url.Parse(r.Location)
+	if err != nil || u.Path != wantPath {
+		t.Fatalf("Location = %q, want path %q", r.Location, wantPath)
+	}
+}
+
+// assertLoginRedirect wants a 303 to /login; when wantNext is not empty the
+// decoded `next` query value must equal it.
+func assertLoginRedirect(t testing.TB, r resp, wantNext string) {
+	t.Helper()
+	assertRedirectPath(t, r, "/login")
+	if wantNext == "" {
+		return
+	}
+	u, _ := url.Parse(r.Location)
+	if got := u.Query().Get("next"); got != wantNext {
+		t.Fatalf("Location = %q: next = %q, want %q", r.Location, got, wantNext)
+	}
+}
+
+func assertContains(t testing.TB, r resp, want string) {
+	t.Helper()
+	if !strings.Contains(r.Body, want) {
+		t.Errorf("body lacks %q\nbody: %s", want, snippet(r.Body))
+	}
+}
+
+func assertNotContains(t testing.TB, r resp, unwanted string) {
+	t.Helper()
+	if strings.Contains(r.Body, unwanted) {
+		t.Errorf("body must not contain %q\nbody: %s", unwanted, snippet(r.Body))
+	}
+}
+
+// assertHeader wants header key to start with wantPrefix.
+func assertHeader(t testing.TB, r resp, key, wantPrefix string) {
+	t.Helper()
+	if got := r.Header.Get(key); !strings.HasPrefix(got, wantPrefix) {
+		t.Errorf("header %s = %q, want prefix %q", key, got, wantPrefix)
+	}
+}
+
+// assertHeaderContains wants header key to contain want.
+func assertHeaderContains(t testing.TB, r resp, key, want string) {
+	t.Helper()
+	if got := r.Header.Get(key); !strings.Contains(got, want) {
+		t.Errorf("header %s = %q, want it to contain %q", key, got, want)
+	}
+}
+
+// assertBefore wants a to appear in the body before b.
+func assertBefore(t testing.TB, r resp, a, b string) {
+	t.Helper()
+	ia, ib := strings.Index(r.Body, a), strings.Index(r.Body, b)
+	if ia < 0 || ib < 0 {
+		t.Errorf("body lacks %q (at %d) or %q (at %d)\nbody: %s", a, ia, b, ib, snippet(r.Body))
+		return
+	}
+	if ia > ib {
+		t.Errorf("%q (at %d) should come before %q (at %d)", a, ia, b, ib)
+	}
+}
+
+// ---- HTML helpers -----------------------------------------------------------
+
+// forms splits body into its <form …>…</form> chunks.
+func forms(body string) []string {
+	var out []string
+	rest := body
+	for {
+		i := strings.Index(rest, "<form")
+		if i < 0 {
+			return out
+		}
+		rest = rest[i:]
+		end := strings.Index(rest, "</form>")
+		if end < 0 {
+			return append(out, rest)
+		}
+		out = append(out, rest[:end+len("</form>")])
+		rest = rest[end+len("</form>"):]
+	}
+}
+
+// hasForm reports whether some form in body contains every fragment.
+func hasForm(body string, fragments ...string) bool {
+	for _, f := range forms(body) {
+		ok := true
+		for _, frag := range fragments {
+			if !strings.Contains(f, frag) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
+}
+
+func assertForm(t testing.TB, r resp, fragments ...string) {
+	t.Helper()
+	if !hasForm(r.Body, fragments...) {
+		t.Errorf("no <form> containing all of %q\nbody: %s", fragments, snippet(r.Body))
+	}
+}
+
+func assertNoForm(t testing.TB, r resp, fragments ...string) {
+	t.Helper()
+	if hasForm(r.Body, fragments...) {
+		t.Errorf("unexpected <form> containing all of %q\nbody: %s", fragments, snippet(r.Body))
+	}
+}
+
+var hrefAttr = regexp.MustCompile(`href="([^"]*)"`)
+
+// hasLoginLink reports whether body links to /login with next == wantNext
+// (any URL encoding of next is accepted).
+func hasLoginLink(body, wantNext string) bool {
+	for _, m := range hrefAttr.FindAllStringSubmatch(body, -1) {
+		u, err := url.Parse(html.UnescapeString(m[1]))
+		if err != nil || u.Path != "/login" {
+			continue
+		}
+		if u.Query().Get("next") == wantNext {
+			return true
+		}
+	}
+	return false
+}
+
+var formTag = regexp.MustCompile(`(?is)<form\b[^>]*>`)
+
+// formTags returns every opening <form …> tag in body.
+func formTags(body string) []string {
+	return formTag.FindAllString(body, -1)
+}
+
+// lower is a case-insensitive contains.
+func containsFold(body, want string) bool {
+	return strings.Contains(strings.ToLower(body), strings.ToLower(want))
+}

@@ -1,0 +1,28 @@
+{{define "title"}}Mine · dside events{{end}}
+{{define "content"}}
+<h1>Mine</h1>
+{{if .Empty}}<p>Nothing here yet. Press Interested on an event and it shows up here.</p>{{end}}
+{{if or .Upcoming.Days .Past}}
+<h2>Upcoming</h2>
+{{if .Upcoming.Days}}{{template "daylist" .Upcoming}}{{else}}<p>Nothing upcoming. Your past events are below.</p>{{end}}
+{{end}}
+{{with .Past}}
+<h2>Past</h2>
+{{template "pastlist" .}}
+{{end}}
+{{with .Hidden}}
+<h2>Hidden</h2>
+<p class="muted">Events you marked not interested. They stay out of your feed.</p>
+<ul class="past">
+  {{range .}}
+  <li>
+    <a href="/e/{{.Slug}}">{{.Title}}</a> <small>· <time datetime="{{iso .Start}}">{{day .Start}}</time> · {{.Venue}}</small>
+    <form method="post" action="/e/{{.Slug}}/interest" class="inline">
+      <input type="hidden" name="back" value="/mine">
+      <button name="state" value="clear">Show again</button>
+    </form>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

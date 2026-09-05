@@ -1,0 +1,10 @@
+.git
+.allium-loop
+bin
+e2e
+spec
+*.db
+*.db-wal
+*.db-shm
+*.md
+!README.md
