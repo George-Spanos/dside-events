@@ -22,7 +22,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     needs: [test]
-    environment: prod
     steps:
       - uses: actions/checkout@v7
       - name: Set up Docker Buildx
@@ -32,12 +31,12 @@ jobs:
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ secrets.CONTAINER_USERNAME }}
-          password: ${{ secrets.CONTAINER_PASSWORD }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: ${{ secrets.REPOSITORY_NAME }}/dside-events:${{ github.sha }},${{ secrets.REPOSITORY_NAME }}/dside-events:latest
+          tags: ghcr.io/george-spanos/dside-events:${{ github.sha }},ghcr.io/george-spanos/dside-events:latest
           context: .

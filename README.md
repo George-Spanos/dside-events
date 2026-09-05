@@ -68,7 +68,7 @@ Local build:
 
 Production (Watchtower-friendly): every push to `main` runs `make check` and
 publishes `ghcr.io/george-spanos/dside-events:latest` (plus a `:<sha>` tag) via
-`.github/workflows/build.yml` (secrets `CONTAINER_USERNAME`, `CONTAINER_PASSWORD`, `REPOSITORY_NAME` in the `prod` environment, same as planning-poker). On the server:
+`.github/workflows/build.yml` (no secrets needed: it logs in to GHCR with the workflow's own `GITHUB_TOKEN`). On the server:
 
     BASE_URL=https://events.example.com make prod-up
     make prod-curators                        # creates the two curators, prints their secret links
