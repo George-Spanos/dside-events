@@ -5,6 +5,14 @@ HTML. Product spec: `PROJECT.md`.
 
 ## Run locally
 
+Everything goes through `make` (`make help` lists the targets):
+
+    make run                                  # dev server on 127.0.0.1:8080, codes in otp.log
+    make poster EMAIL=you@example.com NAME="You"
+    make check                                # fmt + vet + unit tests + e2e
+
+Without make:
+
     ADDR=127.0.0.1:8080 DEV_OTP_FILE=/tmp/otp.log go run . serve
 
 Prints exactly one line to stdout (`listening on http://127.0.0.1:8080`) and
