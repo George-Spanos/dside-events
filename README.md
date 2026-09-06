@@ -8,8 +8,8 @@ HTML. Product spec: `PROJECT.md`.
 Everything goes through `make` (`make help` lists the targets):
 
     make run                                  # dev server on 127.0.0.1:8080
-    make poster NAME="Maria P." [SLUG=maria]  # a curator; prints their secret link
-    make poster-link SLUG=maria               # a new link for an existing curator
+    make curator NAME="Maria P." [SLUG=maria] # a curator; prints their secret link
+    make curator-links                        # every curator's secret link
     make check                                # fmt + vet + unit tests + e2e
 
 Without make:
@@ -107,11 +107,20 @@ publishes `ghcr.io/george-spanos/dside-events:latest` (plus a `:<sha>` tag) via
 `.github/workflows/build.yml` (no secrets needed: it logs in to GHCR with the workflow's own `GITHUB_TOKEN`). On the server:
 
     BASE_URL=https://events.example.com make prod-up
-    make prod-curators                        # creates the two curators, prints their secret links
-    make prod-poster-links                    # list every curator's secret link (also saved to curators.txt)
+    make prod-curator NAME="Maria P."         # one curator, appended to curators.txt
+    make prod-curator-links                   # every curator's link (rewrites curators.txt)
 
-`prod-curators` is idempotent: the names live in the `CURATORS` variable of the
-Makefile; re-running prints `link (unchanged, …)` for curators that already exist.
+`prod-curator` writes the curator to the production database and appends the
+`poster <slug>` / `link <url>` pair it prints to `curators.txt` (gitignored), so
+the roster and its links live in that one private file rather than in the
+Makefile. It is idempotent: a curator who already exists prints
+`link (unchanged, …)`, and because that is not a usable link, `curators.txt` is
+left alone — recover the existing one with `prod-curator-links`, or replace it
+with `poster-link -slug <slug>`. Note the asymmetry: `prod-curator` **appends**,
+`prod-curator-links` **overwrites**.
+
+`NAME` and `SLUG` are deliberately not `?=`, so an exported `NAME` in your shell
+cannot end up naming a curator in production. Pass them on the command line.
 
 The service has `restart: always`, so
 Watchtower pulls the new image and restarts the container on its own.
@@ -121,7 +130,7 @@ Republishing the seed files after correcting them:
     make prod-reset-events                    # backs up first, then empties the events
     make prod-seed                            # publishes every seed/*.tsv
 
-`prod-seed` takes all of `seed/*.tsv` in one go, as one curator (`POSTER`,
+`prod-seed` takes all of `seed/*.tsv` in one go, as one curator (`CURATOR`,
 default `george-spanos`), and is safe to re-run: an event that already exists
 (same curator, title and day) comes back 422 and is reported as skipped, so
 nothing is created twice and nothing already posted is modified. Add
