@@ -1,7 +1,7 @@
 // dside events service worker. Served through text/template; VERSION changes with every build.
 var VERSION = '{{.Version}}';
 var CACHE = 'dside-' + VERSION;
-var PRECACHE = ['/offline', '/static/style.css?v=' + VERSION, '/icon.svg'];
+var PRECACHE = ['/offline', '/static/style.css?v=' + VERSION, '/icon.svg?v=' + VERSION];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE)

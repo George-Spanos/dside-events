@@ -15,7 +15,8 @@ var staticFS embed.FS
 
 // swTemplate renders static/sw.js with the build version baked in.
 type swTemplate struct {
-	tpl *texttemplate.Template
+	tpl      *texttemplate.Template
+	manifest *texttemplate.Template
 }
 
 // initStatic parses the service worker template.
@@ -28,7 +29,15 @@ func (s *Server) initStatic() error {
 	if err != nil {
 		return fmt.Errorf("static/sw.js: %w", err)
 	}
-	s.sw = &swTemplate{tpl: tpl}
+	mraw, err := fs.ReadFile(staticFS, "static/manifest.webmanifest")
+	if err != nil {
+		return fmt.Errorf("static/manifest.webmanifest: %w", err)
+	}
+	mtpl, err := texttemplate.New("manifest").Parse(string(mraw))
+	if err != nil {
+		return fmt.Errorf("static/manifest.webmanifest: %w", err)
+	}
+	s.sw = &swTemplate{tpl: tpl, manifest: mtpl}
 	return nil
 }
 
@@ -44,10 +53,24 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, staticFS, name)
 }
 
+// manifest renders the web app manifest with versioned icon URLs, so a new
+// deploy also refreshes the icons browsers cached.
 func (s *Server) manifest(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if err := s.sw.manifest.Execute(&buf, struct{ Version string }{s.version}); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/manifest+json")
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFileFS(w, r, staticFS, "static/manifest.webmanifest")
+	w.Write(buf.Bytes())
+}
+
+// favicon answers the blind /favicon.ico request some browsers still make.
+func (s *Server) favicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFileFS(w, r, staticFS, "static/icon-180.png")
 }
 
 func (s *Server) serviceWorker(w http.ResponseWriter, r *http.Request) {

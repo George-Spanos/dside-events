@@ -64,6 +64,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /static/", s.static)
 	mux.HandleFunc("GET /manifest.webmanifest", s.manifest)
+	mux.HandleFunc("GET /favicon.ico", s.favicon)
 	mux.HandleFunc("GET /sw.js", s.serviceWorker)
 	mux.HandleFunc("GET /icon.svg", s.iconSVG)
 	mux.HandleFunc("GET /icon-180.png", s.iconPNG)
