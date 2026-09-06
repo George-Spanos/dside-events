@@ -540,6 +540,7 @@ surface Home {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
         for e in mine_next:
             e.slug
             e.title
@@ -549,6 +550,7 @@ surface Home {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
 
     provides:
         StartAccount(visitor) when visitor.session = null
@@ -565,8 +567,10 @@ surface Home {
     related:
         for e in upcoming_next:
             EventDetail(e)
+            PosterPage(e.poster)
         for e in mine_next:
             EventDetail(e)
+            PosterPage(e.poster)
         UpcomingAll
         MyEvents when account != null and mine_next.count > 0
 
@@ -594,9 +598,9 @@ surface Home {
         -- first, when it does not. Every row carries the Interested toggle,
         -- unmistakably pressed ("✓ Interested") when the account is
         -- interested; a press without a session fires StartAccount and then
-        -- MarkInterested in the same request. Days are visibly separated. An
-        -- interested count of zero is omitted from the row. Filters are plain
-        -- text links. Pages are served with Cache-Control: no-store.
+        -- MarkInterested in the same request. Days are visibly separated. The
+        -- interested count is always shown, zero included (the founder fixed
+        -- the row as five lines). Filters are plain text links. Pages are served with Cache-Control: no-store.
 
 }
 
@@ -623,6 +627,7 @@ surface UpcomingAll {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
         for e in following:
             e.slug
             e.title
@@ -632,6 +637,7 @@ surface UpcomingAll {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
 
     provides:
         StartAccount(visitor) when visitor.session = null
@@ -648,6 +654,7 @@ surface UpcomingAll {
     related:
         for e in visible:
             EventDetail(e)
+            PosterPage(e.poster)
 
     @guarantee UpcomingOnly
         -- Only events on or after the current Athens day appear; past events
@@ -667,13 +674,14 @@ surface UpcomingAll {
         -- /following renders following. All three answer 200 with or without
         -- a session; /following without follows shows "You're not following
         -- anything yet. Pick a tag above and press Follow, or follow a curator
-        -- from an event page." The filter links are the same row Home shows
-        -- and always include following. When a tag filter is active the
+        -- from an event page." The filter row is Home's, except that on
+        -- /upcoming its all and tag links stay on /upcoming; it always
+        -- includes following. When a tag filter is active the
         -- follow or unfollow toggle for that tag sits under the filter links;
         -- a follow posted without a session fires StartAccount and then
         -- FollowTag in the same request. Events are grouped by Athens day in
-        -- ascending start order; an interested count of zero is omitted from
-        -- the row. Every row carries the Interested toggle, pressed when the
+        -- ascending start order; the interested count is always shown, zero
+        -- included. Every row carries the Interested toggle, pressed when the
         -- account is interested; a press without a session fires StartAccount
         -- and then MarkInterested in the same request. This is the whole list
         -- Home links to: no row limit, no pagination. Filters are plain text
@@ -765,15 +773,13 @@ surface PosterPage {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
         for e in past:
             e.slug
             e.title
             e.starts_at
             e.venue
-            e.price
             e.interested_count
-            e.tags
-            e.poster.name
 
     provides:
         StartAccount(visitor) when visitor.session = null
@@ -788,6 +794,7 @@ surface PosterPage {
     related:
         for e in upcoming:
             EventDetail(e)
+            PosterPage(e.poster)
         for e in past:
             EventDetail(e)
 
@@ -820,15 +827,13 @@ surface MyEvents {
             e.interested_count
             e.tags
             e.poster.name
+            e.poster.slug
         for e in past:
             e.slug
             e.title
             e.starts_at
             e.venue
-            e.price
             e.interested_count
-            e.tags
-            e.poster.name
         for e in hidden:
             e.slug
             e.title
@@ -849,6 +854,7 @@ surface MyEvents {
     related:
         for e in upcoming:
             EventDetail(e)
+            PosterPage(e.poster)
         for e in past:
             EventDetail(e)
         for e in hidden:
@@ -1049,4 +1055,5 @@ open question "OQ-14 PWA icon: is a generated SVG/PNG icon the sole exception to
 open question "OQ-15 Packaging: single Go module dside.studio/events with SQLite as the only third-party dependency, deployed as a Docker image with a data volume? (default: yes)"
 open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their interest toggles)"
 open question "OQ-17 Abuse: should cookieless POSTs creating accounts be rate-limited or should idle accounts be purged? (default: no, POC)"
+open question "OQ-19 Reaching /mine: since the nav lost its mine link, a visitor whose marks are all past or hidden has no link to /mine (Past, Hidden). Add one on /account? (default: yes, a plain link on the account page; not implemented until the founder agrees)"
 open question "OQ-18 Key at rest: the secret key is stored in clear so the account page can show the link, which makes a copy of the database every login; acceptable for the POC, or should links be shown only once at creation and rotation with a hash at rest? (default: in clear, POC)"
