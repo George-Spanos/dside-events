@@ -143,8 +143,8 @@ func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 		if sessionSetCookie(r) != "" || v.cookie("session") != nil {
 			t.Fatalf("GET %s set a session cookie for a visitor without one", path)
 		}
-		// Nav is always mine · account.
-		assertContains(t, r, `href="/mine"`)
+		// Nav is always account (the mine link left the nav on 2026-09-06).
+		assertContains(t, r, `href="/account"`)
 		assertContains(t, r, `href="/account"`)
 		assertNotContains(t, r, `href="/login`)
 	}

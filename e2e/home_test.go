@@ -144,8 +144,9 @@ func TestHome_MineColumn_AbsentForAnonAndUnmarked(t *testing.T) {
 		assertContains(t, r, `<section class="upcoming">`)
 		assertContains(t, r, headingUpcoming)
 		assertContains(t, r, `<a href="/upcoming">`+linkAllUpcoming+`</a>`)
-		// The nav still links to /mine as always.
-		assertContains(t, r, `href="/mine"`)
+		// Without a Mine column there is no link to /mine anywhere: the nav
+		// dropped it (founder, 2026-09-06), the column's footer carries it.
+		assertNotContains(t, r, `href="/mine"`)
 	}
 }
 
@@ -272,7 +273,7 @@ func TestUpcoming_Page_TagFilter_Unknown404(t *testing.T) {
 	assertContains(t, r, th.Title)
 	assertContains(t, r, co.Title)
 	assertContains(t, r, `href="/following"`)
-	assertContains(t, r, `href="/mine"`)
+	assertNotContains(t, r, `href="/mine"`)
 	assertContains(t, r, `href="/account"`)
 	assertHeaderContains(t, r, "Cache-Control", "no-store")
 	if v.cookie("session") != nil || sessionSetCookie(r) != "" {
