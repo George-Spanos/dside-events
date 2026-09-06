@@ -9,3 +9,8 @@ bin/
 # secret curator links written by make prod-curators / poster-link — never commit
 curators.txt
 backups/
+
+# design tooling: the shared config and the design system are committed, the
+# per-machine overrides and the hook's cache are not
+.impeccable/config.local.json
+.impeccable/hook.cache.json

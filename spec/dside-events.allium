@@ -617,37 +617,56 @@ surface Home {
             EventDetail(e)
             PosterPage(e.poster)
         UpcomingAll
-        MyEvents when account != null and mine_next.count > 0
+        MyEvents when account != null
 
     @guarantee TenAtMost
         -- The home list never shows more than config.home_list_size events
         -- per column; the founder chose the number and it is not a setting.
         -- There is no pagination: the rest is one link away on UpcomingAll.
+    -- 2026-09-06: the founder renamed the column from "Mine" to "My feed" and
+    -- ruled that it always renders. It used to appear only with a session and
+    -- at least one upcoming followed event, which meant an anonymous visitor
+    -- never learned the column existed, the first Follow inserted a column
+    -- above the visitor's scroll position, and a tag filter that emptied the
+    -- column deleted it mid-session. The empty column now carries the copy
+    -- instead, which is also where a visitor without a session is told what
+    -- Follow costs.
     @guarantee SideBySide
-        -- Mine and Upcoming are two columns of one screen, Mine first. Mine
-        -- appears only when the visitor has a session and at least one
-        -- upcoming followed event; otherwise the screen is Upcoming alone.
+        -- My feed and Upcoming are two columns of one screen, My feed first.
+        -- Both columns always render; an empty My feed states why it is empty
+        -- rather than being omitted.
     @guidance
         -- HTTP: GET / and GET /?tag={tag}, 200 with or without a session;
         -- unknown tag 404. The filters row (all · one link per Tag) spans the
         -- full width above both columns and narrows both. With script, a
         -- press on a row re-renders both columns from the response, so a
-        -- followed event appears in Mine at once; without script the page
-        -- reloads to the same result. Column Mine: heading
-        -- "Mine", the rows of mine_next grouped by Athens day, then the link
-        -- "All of mine →" to /mine. Column Upcoming: heading "Upcoming", the rows of
+        -- followed event appears in My feed at once, and focus returns to the
+        -- control that was pressed; without script the page reloads to the
+        -- same result. Column My feed: heading "My feed", the rows of
+        -- mine_next grouped by Athens day, then the link "All of my feed →"
+        -- to /mine, shown once the visitor has an account. With no rows the
+        -- column carries one line instead: without a session, "Follow an
+        -- event and it starts a list on this device. No sign-up, no email.";
+        -- with a session, "Nothing here yet. Follow an event and it shows up
+        -- here.", or "Nothing of yours tagged {tag}." under a filter.
+        -- Column Upcoming: heading "Upcoming", the rows of
         -- upcoming_next grouped by Athens day, then the link "All upcoming
         -- events →" to /upcoming (carrying ?tag= when filtered); that link is
         -- shown even when the list is empty, under the usual empty copy. The
-        -- columns sit side by side when the screen has room and stack, Mine
-        -- first, when it does not. Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once),
+        -- columns sit side by side when the screen has room and stack, My
+        -- feed first, when it does not. Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once),
         -- labelled "Follow" until pressed, then "Following" with a check mark
         -- drawn by the stylesheet (aria-pressed) when the account follows the
         -- event; a press without a session fires StartAccount and then
-        -- FollowEvent in the same request. Days are visibly separated. The
-        -- follower count is always shown as "{n} following", zero included
-        -- (the founder fixed the row as five lines). Filters are plain text
-        -- links. Pages are served with Cache-Control: no-store.
+        -- FollowEvent in the same request. Hide keeps the link accent and a
+        -- target no smaller than the text it sits under, because it cannot be
+        -- undone from this surface. Days are visibly separated. The follower
+        -- count is always shown as "{n} following", zero included (the founder
+        -- fixed the row as five lines; on 2026-09-06 he ruled their order as
+        -- title, tags, "venue, price", "{n} following", curator, so the count
+        -- no longer sits directly under the curator's name and the name ends
+        -- the row). Filters are plain text links. Pages are served with
+        -- Cache-Control: no-store.
 
 }
 

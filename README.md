@@ -23,17 +23,20 @@ logs to stderr.
 
 | Path | What it shows |
 |---|---|
-| `/`, `/?tag=x` | home: the next 10 upcoming events (a fixed founder decision, not a setting) next to the events you follow, side by side; "All upcoming events →" leads to the full list |
+| `/`, `/?tag=x` | home: "My feed" (the events you follow) next to the next 10 upcoming events (a fixed founder decision, not a setting), side by side; "All upcoming events →" leads to the full list |
 | `/upcoming`, `/upcoming?tag=x` | all upcoming events, day-grouped |
-| `/mine` | your Upcoming, Past and Hidden events |
+| `/mine` | My feed: your Upcoming, Past and Hidden events |
 | `/e/{slug}` | one event; Follow / Hide, and how many follow it |
 | `/p/{slug}` | a curator's events |
 | `/account` | your secret link, forget / delete |
 
+Both home columns always render; with no rows, My feed says why it is empty,
+which is also where a visitor without a session is told what Follow costs.
+
 Every upcoming row, on every page, carries the Follow toggle
 (`POST /e/{slug}/follow` with `state=follow|hide|clear`); a pressed one reads
-`✓ Following`. Hiding is only offered on the event page and stays private.
-Unknown `tag` values are 404. An event carries at most 3 links.
+`✓ Following`. Hiding is offered on every row and on the event page, and stays
+private. Unknown `tag` values are 404. An event carries at most 3 links.
 
 | Route | Form fields |
 |---|---|
