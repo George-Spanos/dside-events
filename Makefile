@@ -12,8 +12,9 @@ CURATORS := "Katerina Spatharou" "George Spanos"
 # Overridable curator details for `make poster`.
 NAME ?=
 SLUG ?=
+POSTER ?= george-spanos
 
-.PHONY: help build run poster poster-links test e2e check fmt vet docker-up docker-down docker-poster docker-poster-links prod-up prod-curators prod-poster-links prod-backup prod-restore clean
+.PHONY: help build run poster poster-links test e2e check fmt vet docker-up docker-down docker-poster docker-poster-links prod-up prod-curators prod-poster-links prod-seed prod-backup prod-restore clean
 
 help: ## show this list
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -67,6 +68,12 @@ prod-curators: ## create the production curators (idempotent), print their secre
 
 prod-poster-links: ## list every production curator with their secret link, saved to curators.txt (gitignored)
 	$(PROD) exec -T events /dside-events poster-links | tee curators.txt
+
+prod-seed: ## publish a TSV of events on production as a curator from curators.txt: make prod-seed FILE=seed/jazz-athens-2026-09.tsv [POSTER=george-spanos]
+	@test -f "$(FILE)" || { echo 'usage: make prod-seed FILE=seed/<events>.tsv [POSTER=george-spanos]'; exit 2; }
+	@link=$$(awk -v p="poster $(POSTER)" 'index($$0, p" ")==1 || $$0==p {getline; print $$2}' curators.txt | grep '^http' | tail -1); \
+	test -n "$$link" || { echo "no secret link for $(POSTER) in curators.txt; run make prod-poster-links first"; exit 2; }; \
+	seed/seed.sh "$$link" "$(FILE)"
 
 prod-backup: ## snapshot the production database into backups/events-<UTC time>.db (safe while running)
 	@mkdir -p backups
