@@ -171,6 +171,37 @@ func TestHome_MineColumn_EmptyCopyForAnonAndUnmarked(t *testing.T) {
 	}
 }
 
+// spec: Home, UpcomingAll, Event.follower_count, Poster
+func TestRow_MetaLineOrder(t *testing.T) {
+	f := validEvent(t, tomorrow())
+	f.Title = uniqTitle(t, "Ordered")
+	f.Venue, f.Price = uniqTitle(t, "Venue"), "€12"
+	slug := createEvent(t, asPoster(t, poster1), f)
+
+	// The founder fixed the row at five lines on 2026-09-06 and their order
+	// with it: the follower count no longer sits directly under the curator's
+	// name, and the name ends the row. Order is the whole obligation here, so
+	// assert the sequence rather than mere presence.
+	// /upcoming renders the same row partial with no ten-event cap, so the
+	// row is always present however many events the suite has posted.
+	row := rowFor(anon(t).get("/upcoming").Body, slug)
+	if row == "" {
+		t.Fatalf("/upcoming has no row for /e/%s", slug)
+	}
+	want := []string{f.Title, f.Tags[0], f.Venue, "€12", "following", poster1.Name}
+	at := -1
+	for _, s := range want {
+		i := strings.Index(row, s)
+		if i < 0 {
+			t.Fatalf("row lacks %q\nrow: %s", s, snippet(row))
+		}
+		if i < at {
+			t.Errorf("row has %q out of order (want title, tags, venue, price, count, curator)\nrow: %s", s, snippet(row))
+		}
+		at = i
+	}
+}
+
 // spec: Home, Home.SideBySide, FollowEvent, UnfollowEvent, HideEvent, MyEvents
 func TestHome_MineColumn_ShowsFollowedUpcoming(t *testing.T) {
 	f := validEvent(t, tomorrow())

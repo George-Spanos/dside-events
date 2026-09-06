@@ -607,7 +607,7 @@ surface Home {
             UnfollowEvent(account, e)
                 when account != null and e.follows.any(f => f.account = account and f.state = following)
         for e in mine_next:
-            UnfollowEvent(account, e)                        -- every row of Mine is followed by construction
+            UnfollowEvent(account, e)                        -- every row of My feed is followed by construction
 
     related:
         for e in upcoming_next:
@@ -780,8 +780,10 @@ surface EventDetail {
         -- their page; the name is the trust signal.
     @guarantee HiddenIsPrivate
         -- The hidden state is shown only to the account that set it, as
-        -- "Hidden from your feed." with a clear action; the public count
-        -- never includes it.
+        -- "Hidden from Upcoming." with a clear action; the public count
+        -- never includes it. (2026-09-06: was "Hidden from your feed."
+        -- until the My feed rename gave "feed" a single meaning; hiding
+        -- keeps an event out of Upcoming, not out of My feed.)
     @guidance
         -- HTTP: GET /e/{slug}; unknown slug 404. The page is identical with
         -- and without a session: two toggle buttons post to /e/{slug}/follow
@@ -918,7 +920,7 @@ surface MyEvents {
         -- Upcoming (ascending), Past (descending) and Hidden; upcoming rows
         -- carry the Follow toggle, shown pressed, and pressing it unfollows;
         -- past rows carry none. Hidden carries the note "Events you hid. They
-        -- stay out of your feed." and a "Show again" button (state=clear) per
+        -- stay out of Upcoming." and a "Show again" button (state=clear) per
         -- row. The Upcoming heading appears only when at least one upcoming
         -- event is followed; the empty state "Nothing here yet. Follow an
         -- event and it shows up here." appears when the account has no event
