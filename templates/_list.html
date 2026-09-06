@@ -5,21 +5,23 @@
   {{range .Events}}
   <li{{if gt .SeriesCount 1}} data-series="{{.SeriesID}}"{{end}}>
     <time datetime="{{iso .Start}}">{{clock .Start}}</time>
-    <div>
-      <a href="/e/{{.Slug}}"{{if $.Morph}} style="view-transition-name: e-{{.Slug}}"{{end}}>{{.Title}}</a>
-      <small class="meta">
-        <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
-        <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
-        <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
-        <span>{{.Followers}} following</span>
-        {{if gt .SeriesCount 1}}<span class="series">One of {{.SeriesCount}} dates</span>{{end}}
-      </small>
+    <div class="rowbody">
+      <div>
+        <a href="/e/{{.Slug}}"{{if $.Morph}} style="view-transition-name: e-{{.Slug}}"{{end}}>{{.Title}}</a>
+        <small class="meta">
+          <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
+          <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
+          <span>{{.Followers}} following</span>
+          <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
+          {{if gt .SeriesCount 1}}<span class="series">One of {{.SeriesCount}} dates</span>{{end}}
+        </small>
+      </div>
+      {{if .Back}}<form method="post" action="/e/{{.Slug}}/follow" data-toggle class="row-toggle">
+        <input type="hidden" name="back" value="{{.Back}}">
+        <button name="state" value="{{if .Following}}clear{{else}}follow{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if .Following}}Following{{else}}Follow{{end}}</button>
+        <button name="state" value="hide" class="linklike hide">Hide</button>
+      </form>{{end}}
     </div>
-    {{if .Back}}<form method="post" action="/e/{{.Slug}}/follow" data-toggle class="row-toggle">
-      <input type="hidden" name="back" value="{{.Back}}">
-      <button name="state" value="{{if .Following}}clear{{else}}follow{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if .Following}}Following{{else}}Follow{{end}}</button>
-      <button name="state" value="hide" class="linklike hide">Hide</button>
-    </form>{{end}}
   </li>
   {{end}}
 </ul>

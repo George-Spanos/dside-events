@@ -102,12 +102,20 @@ footer { margin-top: 3rem; }
 .day b { font-weight: bold; }
 h2 + .day { margin-top: 1rem; }
 
-/* Programme row: time | title + details | Follow toggle */
-.events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 1rem; }
+/* Programme row: time | (title + details, Follow toggle). The body is one
+   wrapping flex cell, so the toggle sits beside the details when the column
+   can afford both and drops under them when it cannot. Intrinsic sizing, no
+   breakpoint: 16rem is the narrowest the details are allowed to get. */
+.events li { display: grid; grid-template-columns: 6ch 1fr; column-gap: 1rem; margin-bottom: 1rem; }
+.rowbody { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; }
+.rowbody > div { flex: 1 1 16rem; max-width: var(--reading); }
+.rowbody > form { flex: 0 0 auto; }
 .meta span { display: block; }
 .events time { font-variant-numeric: tabular-nums; }
 .row-toggle { margin: 0; text-align: center; }
-.row-toggle .hide { display: block; margin: .35rem auto 0; font-size: .9375rem; color: var(--muted); }
+/* Hide is quiet by size, not by colour: it keeps the link accent because it
+   acts, and it keeps a real target because it cannot be undone from here. */
+.row-toggle .hide { display: block; min-height: 1.75rem; margin: .5rem auto 0; padding: .25rem .5rem; font-size: .9375rem; }
 
 /* Event page */
 .desc p { white-space: pre-line; }
@@ -230,7 +238,7 @@ button[aria-pressed="true"] { font-weight: inherit; }
 ::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2, 0, 0, 1); }
 header { view-transition-name: header; }
 .filters { view-transition-name: filters; }
-.events li > div > a:first-child { display: inline-block; }
+.rowbody > div > a:first-child { display: inline-block; }
 
 /* Motion is optional: final state immediately, page transitions included. */
 @media (prefers-reduced-motion: reduce) {

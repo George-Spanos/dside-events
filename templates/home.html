@@ -2,12 +2,12 @@
 {{define "content"}}
 {{template "filters" .}}
 <div class="columns">
-{{if .Mine.Days}}<section class="mine">
-<h2>Mine</h2>
-{{template "daylist" .Mine}}
-<p><a href="/mine">All of mine →</a></p>
+<section class="mine">
+<h2>My feed</h2>
+{{if .Mine.Days}}{{template "daylist" .Mine}}{{else}}<p>{{.MineEmpty}}</p>{{end}}
+{{if .Account}}<p><a href="/mine">All of my feed →</a></p>{{end}}
 </section>
-{{end}}<section class="upcoming">
+<section class="upcoming">
 <h2>Upcoming</h2>
 {{if .Upcoming.Days}}{{template "daylist" .Upcoming}}{{else}}<p>{{.Empty}}</p>{{end}}
 <p><a href="{{.AllHref}}">All upcoming events →</a></p>

@@ -32,7 +32,16 @@
         // Home: a press moves the event between Mine and Upcoming, so take
         // both columns from the response instead of patching one form.
         var columns = document.querySelector('.columns'), freshColumns = doc.querySelector('.columns');
-        if (columns && freshColumns) { columns.replaceWith(freshColumns); return; }
+        if (columns && freshColumns) {
+          columns.replaceWith(freshColumns);
+          // The pressed button was inside the subtree we just discarded, so
+          // focus would fall to <body> and a keyboard visitor would restart
+          // from the top of the page. Put it back on the same control, and
+          // let its aria-pressed announce the new state on the way.
+          var again = freshColumns.querySelector('form[action="' + key + '"] [aria-pressed]');
+          if (again) again.focus({ preventScroll: true });
+          return;
+        }
         var fresh = doc.querySelector('form[action="' + key + '"]');
         var row = form.closest('.events li'), series = row && row.dataset.series;
         if (fresh) {

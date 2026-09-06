@@ -109,7 +109,7 @@ func TestHide_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	// Her own event page says so and offers clear.
 	r := alice.get(page)
 	assertStatus(t, r, 200)
-	assertContains(t, r, "Hidden from your feed")
+	assertContains(t, r, "Hidden from Upcoming")
 	assertForm(t, r, `action="`+page+`/follow"`, `value="clear"`)
 
 	// Everyone else sees the event untouched, counter unchanged, no trace.
@@ -123,7 +123,7 @@ func TestHide_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 		if n := followerCount(t, r.Body); n != 0 {
 			t.Errorf("%s: counter = %d, want 0", name, n)
 		}
-		if strings.Contains(r.Body, "Hidden from your feed") || pressedHidden.MatchString(r.Body) {
+		if strings.Contains(r.Body, "Hidden from Upcoming") || pressedHidden.MatchString(r.Body) {
 			t.Errorf("%s: event page leaks alice's hidden state", name)
 		}
 	}
@@ -183,7 +183,7 @@ func TestEventFollow_SwitchFollowToHide(t *testing.T) {
 		t.Errorf("counter after switching back = %d, want 1", n)
 	}
 	assertListed(t, alice, "/upcoming", f.Title)
-	assertNotContains(t, alice.get(page), "Hidden from your feed")
+	assertNotContains(t, alice.get(page), "Hidden from Upcoming")
 }
 
 // spec: UnfollowEvent, MyEvents, UpcomingAll
@@ -200,7 +200,7 @@ func TestEventFollow_Clear_RestoresDefault(t *testing.T) {
 	assertRedirect(t, setEventFollow(alice, slug, "clear", "/mine"), "/mine")
 	assertListed(t, alice, "/upcoming", f.Title)
 	assertNotContains(t, alice.get("/mine"), f.Title)
-	assertNotContains(t, alice.get(page), "Hidden from your feed")
+	assertNotContains(t, alice.get(page), "Hidden from Upcoming")
 
 	// follow → clear: counter drops, gone from /mine.
 	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
@@ -310,7 +310,7 @@ func TestFollow_AnonFollowStartsAccount(t *testing.T) {
 		t.Fatalf("anonymous Hide did not set a session cookie")
 	}
 	assertNotListed(t, w, "/upcoming", f.Title)
-	assertContains(t, w.get(page), "Hidden from your feed")
+	assertContains(t, w.get(page), "Hidden from Upcoming")
 	assertListed(t, anon(t), "/upcoming", f.Title)
 	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter after a hide = %d, want 1", n)

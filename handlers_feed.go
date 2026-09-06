@@ -67,14 +67,15 @@ type feedPage struct {
 	Empty   string
 }
 
-// homePage renders /: Mine and Upcoming side by side.
+// homePage renders /: My feed and Upcoming side by side.
 type homePage struct {
 	Base
-	Filters  []Filter
-	Mine     DayList // empty without a session or without upcoming followed events
-	Upcoming DayList
-	Empty    string
-	AllHref  string // /upcoming, with the tag filter when set
+	Filters   []Filter
+	Mine      DayList // empty without a session or without upcoming followed events
+	Upcoming  DayList
+	Empty     string
+	MineEmpty string // what the My feed column says when it has no rows
+	AllHref   string // /upcoming, with the tag filter when set
 }
 
 func row(e store.Event) EventRow {
@@ -169,11 +170,25 @@ func (s *Server) tagFilter(r *http.Request) (tag, empty string, err error) {
 	if !validTag(tag) {
 		return "", "", errNotFound
 	}
-	return tag, "No upcoming events tagged " + tag + ".", nil
+	return tag, "No upcoming events tagged " + tag + " yet. Check back soon.", nil
 }
 
-// home is the front page: the visitor's next followed events (when any) next
-// to the next homeListSize upcoming events.
+// mineEmpty is what the My feed column says when it has no rows. Without a
+// session it is the only place the visitor learns what Follow does, so it
+// states the cost of pressing it rather than describing the empty list.
+func mineEmpty(signedIn bool, tag string) string {
+	switch {
+	case !signedIn:
+		return "Follow an event and it starts a list on this device. No sign-up, no email."
+	case tag != "":
+		return "Nothing of yours tagged " + tag + "."
+	default:
+		return "Nothing here yet. Follow an event and it shows up here."
+	}
+}
+
+// home is the front page: the visitor's next followed events next to the
+// next homeListSize upcoming events. Both columns always render.
 func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
 	tag, empty, err := s.tagFilter(r)
@@ -202,6 +217,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 		}
 		page.Mine = s.groupByDay(toggleRows(mine, back))
 	}
+	page.MineEmpty = mineEmpty(acct != nil, tag)
 	return s.render(w, r, http.StatusOK, "home", page)
 }
 

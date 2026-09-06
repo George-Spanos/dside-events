@@ -1,6 +1,6 @@
-{{define "title"}}Mine · dside events{{end}}
+{{define "title"}}My feed · dside events{{end}}
 {{define "content"}}
-<h1>Mine</h1>
+<h1>My feed</h1>
 {{if .Empty}}<p>Nothing here yet. Follow an event and it shows up here.</p>{{end}}
 {{if or .Upcoming.Days .Past}}
 <h2>Upcoming</h2>
@@ -12,7 +12,7 @@
 {{end}}
 {{with .Hidden}}
 <h2>Hidden</h2>
-<p class="muted">Events you hid. They stay out of your feed.</p>
+<p class="muted">Events you hid. They stay out of Upcoming.</p>
 <ul class="past">
   {{range .}}
   <li>

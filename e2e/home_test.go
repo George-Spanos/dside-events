@@ -14,9 +14,13 @@ const (
 	homeListSize = 10
 
 	linkAllUpcoming = "All upcoming events →"
-	linkAllMine     = "All of mine →"
-	headingMine     = "<h2>Mine</h2>"
+	linkAllMine     = "All of my feed →"
+	headingMine     = "<h2>My feed</h2>"
 	headingUpcoming = "<h2>Upcoming</h2>"
+	// What the My feed column says instead of rows (founder, 2026-09-06: the
+	// column always renders, so its empty copy is a spec obligation).
+	mineEmptyAnon = "Follow an event and it starts a list on this device. No sign-up, no email."
+	mineEmptyUser = "Nothing here yet. Follow an event and it shows up here."
 )
 
 // farEvents creates n events by p on consecutive days about a thousand days
@@ -130,23 +134,40 @@ func TestUpcoming_ListsBeyondTheTenth(t *testing.T) {
 }
 
 // spec: Home, Home.SideBySide, MyEvents, Visitor
-func TestHome_MineColumn_AbsentForAnonAndUnmarked(t *testing.T) {
+func TestHome_MineColumn_EmptyCopyForAnonAndUnmarked(t *testing.T) {
 	createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	for name, c := range map[string]*client{"anon": anon(t), "user with nothing marked": newUser(t)} {
-		r := c.get("/")
+	// The column always renders (founder, 2026-09-06). With no rows it says
+	// why it is empty; without a session that line is also the only place the
+	// visitor is told what pressing Follow costs.
+	for name, tc := range map[string]struct {
+		c        *client
+		empty    string
+		wantLink bool
+	}{
+		"anon":                     {anon(t), mineEmptyAnon, false},
+		"user with nothing marked": {newUser(t), mineEmptyUser, true},
+	} {
+		r := tc.c.get("/")
 		assertStatus(t, r, 200)
-		for _, frag := range []string{headingMine, `<section class="mine">`, linkAllMine} {
-			if strings.Contains(r.Body, frag) {
-				t.Errorf("%s: home page shows a Mine column (%q)\nbody: %s", name, frag, snippet(r.Body))
-			}
-		}
 		assertContains(t, r, `<div class="columns">`)
+		assertBefore(t, r, `<section class="mine">`, `<section class="upcoming">`)
+		assertContains(t, r, headingMine)
+		mine := section(r.Body, "mine")
+		if mine == "" {
+			t.Fatalf(`%s: home page has no <section class="mine">`+"\nbody: %s", name, snippet(r.Body))
+		}
+		if !strings.Contains(mine, tc.empty) {
+			t.Errorf("%s: My feed column lacks %q\nsection: %s", name, tc.empty, snippet(mine))
+		}
 		assertContains(t, r, `<section class="upcoming">`)
 		assertContains(t, r, headingUpcoming)
 		assertContains(t, r, `<a href="/upcoming">`+linkAllUpcoming+`</a>`)
-		// Without a Mine column there is no link to /mine anywhere: the nav
-		// dropped it (founder, 2026-09-06), the column's footer carries it.
-		assertNotContains(t, r, `href="/mine"`)
+		// /mine is reachable as soon as there is an account to reach it for,
+		// so a mis-pressed Hide is always recoverable; an anonymous visitor
+		// has no list yet and gets no link.
+		if got := strings.Contains(mine, `<a href="/mine">`+linkAllMine+`</a>`); got != tc.wantLink {
+			t.Errorf("%s: link to /mine present = %v, want %v\nsection: %s", name, got, tc.wantLink, snippet(mine))
+		}
 	}
 }
 
@@ -190,23 +211,25 @@ func TestHome_MineColumn_ShowsFollowedUpcoming(t *testing.T) {
 	for _, row := range rowsFor(r.Body, slug) {
 		assertRowToggle(t, "home", row, slug, true)
 	}
-	// Alice's follow is hers alone.
-	assertNotContains(t, anon(t).get("/"), headingMine)
-	assertNotContains(t, newUser(t).get("/"), headingMine)
+	// Alice's follow is hers alone: others get the column, never her row.
+	assertNotContains(t, anon(t).get("/"), f.Title)
+	assertNotContains(t, newUser(t).get("/"), f.Title)
 
-	// Clearing empties the column and it goes away.
+	// Clearing empties the column; the column stays and says so.
 	assertRedirect(t, setEventFollow(alice, slug, "clear", "/"), "/")
 	r = alice.get("/")
 	assertStatus(t, r, 200)
-	assertNotContains(t, r, headingMine)
-	assertNotContains(t, r, `<section class="mine">`)
-	assertNotContains(t, r, linkAllMine)
+	assertContains(t, r, headingMine)
+	assertContains(t, r, mineEmptyUser)
+	if mine := section(r.Body, "mine"); rowFor(mine, slug) != "" {
+		t.Errorf("cleared event still sits in My feed\nsection: %s", snippet(mine))
+	}
 
-	// A hidden event is not "mine" either.
+	// A hidden event is not in My feed either.
 	assertRedirect(t, setEventFollow(alice, slug, "hide", "/"), "/")
 	r = alice.get("/")
 	assertStatus(t, r, 200)
-	assertNotContains(t, r, headingMine)
+	assertContains(t, r, headingMine)
 	assertNotContains(t, r, f.Title)
 }
 
@@ -237,14 +260,19 @@ func TestHome_MineColumn_FollowsTagFilter(t *testing.T) {
 	if rowFor(mine, concertSlug) != "" {
 		t.Errorf("Mine column filtered by film still lists the concert /e/%s\nsection: %s", concertSlug, snippet(mine))
 	}
-	// A tag with nothing followed drops the column altogether.
+	// A tag with nothing followed keeps the column and names the tag, rather
+	// than deleting half the page mid-session (founder, 2026-09-06).
 	r := alice.get("/?tag=exhibition")
 	assertStatus(t, r, 200)
-	assertNotContains(t, r, `<section class="mine">`)
+	assertContains(t, r, `<section class="mine">`)
+	assertContains(t, r, "Nothing of yours tagged exhibition.")
+	if m := section(r.Body, "mine"); rowFor(m, concertSlug) != "" || rowFor(m, filmSlug) != "" {
+		t.Errorf("My feed filtered by exhibition still lists rows\nsection: %s", snippet(m))
+	}
 }
 
 // spec: Home, MyEvents, Event.is_upcoming, FollowEvent
-func TestHome_MineColumn_AbsentWhenOnlyPastFollowed(t *testing.T) {
+func TestHome_MineColumn_EmptyWhenOnlyPastFollowed(t *testing.T) {
 	past := validEvent(t, yesterday())
 	past.Title = uniqTitle(t, "Gone By")
 	slug := createEvent(t, asPoster(t, poster1), past)
@@ -255,11 +283,13 @@ func TestHome_MineColumn_AbsentWhenOnlyPastFollowed(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertBefore(t, r, "Past", past.Title)
 
+	// The column renders and stays empty: My feed is upcoming only, and the
+	// past event is one link away behind "All of my feed →".
 	r = alice.get("/")
 	assertStatus(t, r, 200)
-	assertNotContains(t, r, headingMine)
-	assertNotContains(t, r, `<section class="mine">`)
-	assertNotContains(t, r, linkAllMine)
+	assertContains(t, r, headingMine)
+	assertContains(t, r, mineEmptyUser)
+	assertContains(t, r, linkAllMine)
 	assertNotContains(t, r, past.Title)
 	assertContains(t, r, headingUpcoming)
 }

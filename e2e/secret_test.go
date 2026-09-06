@@ -9,7 +9,7 @@ import (
 const (
 	copyLinkBroken    = "This link doesn't work. It may have been replaced with a new one."
 	copyMineEmpty     = "Nothing here yet. Follow an event and it shows up here."
-	copyMineHidden    = "Events you hid. They stay out of your feed."
+	copyMineHidden    = "Events you hid. They stay out of Upcoming."
 	copyAccountNone   = "This device has no list yet. Follow an event and your account starts here. No sign-up, no email."
 	copyAccountDelete = "Deletes your account, your follows and your hidden events. It can't be undone."
 	copyAccountAgain  = "Opened a secret link before? Open it again on this device to continue there."
@@ -100,7 +100,7 @@ func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 
 	r := v.get("/mine")
 	assertStatus(t, r, 200)
-	assertContains(t, r, "Mine")
+	assertContains(t, r, "My feed")
 	assertCopy(t, r, copyMineEmpty)
 	assertNotContains(t, r, `href="/e/`)
 

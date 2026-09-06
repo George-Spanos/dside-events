@@ -73,7 +73,7 @@ func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	if l, _ := secretLink(t, c); l == link {
 		t.Errorf("new account after deletion got the deleted link back")
 	}
-	assertNotContains(t, c.get(page), "Hidden from your feed")
+	assertNotContains(t, c.get(page), "Hidden from Upcoming")
 	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter = %d, want 1 (new account only)", n)
 	}

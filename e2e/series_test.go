@@ -463,7 +463,7 @@ func TestSeries_HideOneHidesAll(t *testing.T) {
 	for _, s := range all {
 		r := alice.get("/e/" + s)
 		assertStatus(t, r, 200)
-		assertContains(t, r, "Hidden from your feed")
+		assertContains(t, r, "Hidden from Upcoming")
 		if !pressedHidden.MatchString(r.Body) {
 			t.Errorf("alice's /e/%s has no pressed Hidden button", s)
 		}
@@ -524,7 +524,7 @@ func TestSeries_ClearOneClearsAll(t *testing.T) {
 		if rowFor(body, s) == "" {
 			t.Errorf("alice's /upcoming lacks /e/%s after clearing the run", s)
 		}
-		assertNotContains(t, alice.get("/e/"+s), "Hidden from your feed")
+		assertNotContains(t, alice.get("/e/"+s), "Hidden from Upcoming")
 	}
 	assertNotContains(t, alice.get("/mine"), f.Title)
 }
