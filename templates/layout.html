@@ -9,22 +9,24 @@
 <link rel="icon" href="/icon.svg?v={{.Version}}" type="image/svg+xml">
 <link rel="icon" href="/icon-192.png?v={{.Version}}" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png?v={{.Version}}">
-<meta name="theme-color" content="#272320">
+<meta name="theme-color" content="#FCF8EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#272320" media="(prefers-color-scheme: dark)">
 <script src="/static/app.js?v={{.Version}}" defer></script>
 </head>
 <body>
+<a href="#main" class="skip">Skip to events</a>
 <header>
   {{if eq .Path "/"}}<h1>dside events</h1>{{else}}<p class="brand"><a href="/">dside events</a></p>{{end}}
   <nav aria-label="Account">
-    {{if eq .Path "/account"}}<strong aria-current="page"><a href="/account">account</a></strong>{{else}}<a href="/account">account</a>{{end}}
-    {{with .Account}}{{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page"><a href="/new">new</a></strong>{{else}}<a href="/new">new</a>{{end}}{{end}}{{end}}
+    {{if eq .Path "/account"}}<a href="/account" aria-current="page">account</a>{{else}}<a href="/account">account</a>{{end}}
+    {{with .Account}}{{if .Poster}} · {{if eq $.Path "/new"}}<a href="/new" aria-current="page">new</a>{{else}}<a href="/new">new</a>{{end}}{{end}}{{end}}
     <form method="post" action="/theme" class="inline theme">
       <input type="hidden" name="back" value="{{.Path}}">
-      · <button name="theme" value="{{if eq .Theme "dark"}}light{{else}}dark{{end}}" class="linklike">{{if eq .Theme "dark"}}light{{else}}dark{{end}}</button>
+      · <button name="theme" value="{{if eq .Theme "dark"}}light{{else}}dark{{end}}" class="linklike" aria-label="Switch to {{if eq .Theme "dark"}}light{{else}}dark{{end}} theme">{{if eq .Theme "dark"}}light{{else}}dark{{end}}</button>
     </form>
   </nav>
 </header>
-<main>
+<main id="main">
 {{template "content" .}}
 </main>
 <footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>

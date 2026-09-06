@@ -71,6 +71,7 @@
   if (t && !document.documentElement.hasAttribute('data-theme') &&
       window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     t.value = 'light'; t.textContent = 'light';
+    t.setAttribute('aria-label', 'Switch to light theme');
   }
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});

@@ -26,7 +26,7 @@ func TestTheme_SwitchIsOnEveryPage_AndWorksWithoutScript(t *testing.T) {
 	r = v.get("/")
 	assertContains(t, r, `<html lang="en" data-theme="dark">`)
 	// Now the toggle offers the way back.
-	assertContains(t, r, `value="light" class="linklike">light</button>`)
+	assertContains(t, r, `value="light" class="linklike" aria-label="Switch to light theme">light</button>`)
 	assertNotContains(t, r, `value="dark" class="linklike"`)
 
 	// Light replaces dark.

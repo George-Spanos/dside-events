@@ -10,6 +10,7 @@ target_fingerprint: "sha256:970929ff85b6876e3aa83f2a0ddb7e0e7eaf8b824895fa7e4ac2
 target_path: /home/gspanos/dside-events/templates/home.html
 timestamp: 2026-09-06T15-18-41Z
 slug: templates-home-html
+closed: true
 ---
 **Method: dual-agent** (A: design review, isolated · B: detector + browser evidence, isolated). Neither saw the other's output; A finished before detector findings entered synthesis.
 

@@ -1,5 +1,5 @@
 {{define "filters"}}
 <nav class="filters" aria-label="Filter events">
-  {{range $i, $f := .Filters}}{{if $i}} · {{end}}{{if $f.Active}}<strong aria-current="page"><a href="{{$f.Href}}">{{$f.Label}}</a></strong>{{else}}<a href="{{$f.Href}}">{{$f.Label}}</a>{{end}}{{end}}
+  {{range $i, $f := .Filters}}{{if $i}} · {{end}}{{if $f.Active}}<a href="{{$f.Href}}" aria-current="page">{{$f.Label}}</a>{{else}}<a href="{{$f.Href}}">{{$f.Label}}</a>{{end}}{{end}}
 </nav>
 {{end}}

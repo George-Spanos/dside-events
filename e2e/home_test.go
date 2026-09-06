@@ -171,6 +171,33 @@ func TestHome_MineColumn_EmptyCopyForAnonAndUnmarked(t *testing.T) {
 	}
 }
 
+// spec: Home, UpcomingAll.FilterableByTag, AccountPage, Visitor
+func TestCurrentPage_MarkedOnTheLinkItself(t *testing.T) {
+	createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
+	v := anon(t)
+
+	// aria-current has to sit on the anchor: a screen reader moving by link
+	// is how the filter row and the nav are read, and a wrapper carrying the
+	// attribute says nothing to it.
+	for _, tc := range []struct{ path, want string }{
+		{"/?tag=film", `<a href="/?tag=film" aria-current="page">film</a>`},
+		{"/upcoming?tag=theater", `<a href="/upcoming?tag=theater" aria-current="page">theater</a>`},
+		{"/account", `<a href="/account" aria-current="page">account</a>`},
+	} {
+		r := v.get(tc.path)
+		assertStatus(t, r, 200)
+		assertContains(t, r, tc.want)
+		if strings.Contains(r.Body, `<strong aria-current`) {
+			t.Errorf("%s marks the current page on a wrapper, not the link\nbody: %s", tc.path, snippet(r.Body))
+		}
+	}
+
+	// The theme control names what it does, not just the state it targets.
+	assertContains(t, v.get("/"), `aria-label="Switch to dark theme"`)
+	// And the list is one tab stop away.
+	assertContains(t, v.get("/"), `<a href="#main" class="skip">`)
+}
+
 // spec: Home, UpcomingAll, Event.follower_count, Poster
 func TestRow_MetaLineOrder(t *testing.T) {
 	f := validEvent(t, tomorrow())

@@ -134,9 +134,9 @@
     {
       "name": "Filters",
       "kind": "nav",
-      "description": "Plain text links separated by middle dots. The active one goes bold and drops its underline — the system's only unlined link.",
-      "html": "<nav class=\"ds-filters\" aria-label=\"Filter events\"><strong aria-current=\"page\"><a href=\"#\">all</a></strong> &middot; <a href=\"#\">concert</a> &middot; <a href=\"#\">theater</a> &middot; <a href=\"#\">film</a> &middot; <a href=\"#\">exhibition</a></nav>",
-      "css": ".ds-filters { line-height: 1.75; margin-bottom: 1rem; color: var(--fg, #2E2823); } .ds-filters a { color: var(--link, #875800); text-decoration: underline; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link, #875800) 55%, transparent); transition: text-decoration-color 150ms cubic-bezier(.2,0,0,1); } .ds-filters [aria-current] { font-weight: bold; } .ds-filters [aria-current] a { color: inherit; text-decoration: none; } @media (hover: hover) { .ds-filters a:hover { text-decoration-color: var(--link, #875800); transition-duration: 0s; } }"
+      "description": "Plain text links separated by middle dots. The active one carries aria-current on the anchor itself, goes bold and drops its underline — the system's only unlined link.",
+      "html": "<nav class=\"ds-filters\" aria-label=\"Filter events\"><a href=\"#\" aria-current=\"page\">all</a> &middot; <a href=\"#\">concert</a> &middot; <a href=\"#\">theater</a> &middot; <a href=\"#\">film</a> &middot; <a href=\"#\">exhibition</a></nav>",
+      "css": ".ds-filters { line-height: 1.75; margin-bottom: 1rem; color: var(--fg, #2E2823); } .ds-filters a { color: var(--link, #875800); text-decoration: underline; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link, #875800) 55%, transparent); transition: text-decoration-color 150ms cubic-bezier(.2,0,0,1); } .ds-filters a[aria-current] { font-weight: bold; color: inherit; text-decoration: none; } @media (hover: hover) { .ds-filters a:hover { text-decoration-color: var(--link, #875800); transition-duration: 0s; } }"
     },
     {
       "name": "Masthead",
