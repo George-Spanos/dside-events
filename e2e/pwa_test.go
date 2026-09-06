@@ -71,7 +71,6 @@ func TestPages_DeclareManifestViewportAndSW(t *testing.T) {
 	}{
 		{"/", anon(t).get("/")},
 		{"/upcoming", anon(t).get("/upcoming")},
-		{"/following", anon(t).get("/following")},
 		{"/e/{slug}", anon(t).get("/e/" + slug)},
 		{"/p/{slug}", anon(t).get("/p/" + poster1.Slug)},
 		{"/mine", u.get("/mine")},
@@ -166,7 +165,7 @@ func TestNotFound_CustomPage(t *testing.T) {
 func TestMethodNotAllowed(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	u := newUser(t)
-	for _, p := range []string{"/follow", "/account/delete", "/account/key", "/forget", "/e/" + slug + "/follow", "/e/" + slug + "/delete"} {
+	for _, p := range []string{"/account/delete", "/account/key", "/forget", "/e/" + slug + "/follow", "/e/" + slug + "/delete"} {
 		r := u.get(p)
 		if r.Status != 405 {
 			t.Errorf("GET %s: status %d, want 405", p, r.Status)
@@ -177,7 +176,7 @@ func TestMethodNotAllowed(t *testing.T) {
 	assertStatus(t, anon(t).get("/e/"+slug), 200)
 }
 
-// spec: PwaAssets, StartAccount, CreateEvent, EditEvent, DeleteEvent, FollowEvent, FollowTag, RotateSecretLink, ForgetDevice, DeleteAccount, OpenSecretLink
+// spec: PwaAssets, StartAccount, CreateEvent, EditEvent, DeleteEvent, FollowEvent, RotateSecretLink, ForgetDevice, DeleteAccount, OpenSecretLink
 func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 	u := anon(t) // its first POST below starts the account
 	p := asPoster(t, poster1)
@@ -199,7 +198,6 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 			return p.postForm("/e/"+slug+"/edit", g.values())
 		}},
 		{"POST /e/{slug}/follow", func() resp { return setEventFollow(u, slug, "follow", "/e/"+slug) }},
-		{"POST /follow", func() resp { return follow(u, "tag", "concert", "1", "/account") }},
 		{"POST /account/key", func() resp { return u.postForm("/account/key", nil) }},
 		{"POST /e/{slug}/delete", func() resp { return p.postForm("/e/"+slug+"/delete", nil) }},
 		{"POST /forget", func() resp {
@@ -232,7 +230,6 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 	hidden := createEvent(t, p, validEvent(t, tomorrow()))
 	u := newUser(t)
 	assertRedirect(t, setEventFollow(u, hidden, "hide", "/mine"), "/mine")
-	assertRedirect(t, follow(u, "poster", poster1.Slug, "1", "/following"), "/following")
 
 	pages := []struct {
 		name string
@@ -252,7 +249,6 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 		{"/ (anon)", anon(t).get("/")},
 		{"/?tag=concert (user)", u.get("/?tag=concert")},
 		{"/upcoming (user)", u.get("/upcoming")},
-		{"/following (user)", u.get("/following")},
 	}
 	for _, pg := range pages {
 		assertStatus(t, pg.r, 200)

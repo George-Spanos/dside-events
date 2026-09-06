@@ -71,8 +71,6 @@ func TestUpcoming_TagFilter(t *testing.T) {
 	for _, tag := range []string{"concert", "theater", "film", "exhibition"} {
 		assertContains(t, r, `href="/?tag=`+tag+`"`)
 	}
-	// The following filter is always offered, session or not.
-	assertContains(t, r, `href="/following"`)
 
 	r = v.get("/?tag=bogus")
 	assertStatus(t, r, 404)
@@ -212,7 +210,7 @@ func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
 	v := anon(t)
 
 	// Read pages: 200, no redirect, no cookie.
-	for _, path := range []string{"/mine", "/following", "/upcoming", "/account"} {
+	for _, path := range []string{"/mine", "/upcoming", "/account"} {
 		r := v.get(path)
 		assertStatus(t, r, 200)
 		if v.cookie("session") != nil || sessionSetCookie(r) != "" {

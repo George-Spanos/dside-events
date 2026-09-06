@@ -250,7 +250,6 @@ func TestUpcoming_Page_TagFilter_Unknown404(t *testing.T) {
 	assertContains(t, r, "<title>Upcoming · dside events</title>")
 	assertContains(t, r, th.Title)
 	assertContains(t, r, co.Title)
-	assertContains(t, r, `href="/following"`)
 	assertNotContains(t, r, `href="/mine"`)
 	assertContains(t, r, `href="/account"`)
 	assertHeaderContains(t, r, "Cache-Control", "no-store")

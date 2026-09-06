@@ -89,23 +89,18 @@ func asPoster(t testing.TB, p poster) *client {
 }
 
 // newUser returns a fresh client on the shared server whose account was just
-// created by its first action (a tag follow), then undone so the account
+// created by its first action, an event follow, then cleared so the account
 // follows nothing and has marked nothing.
 func newUser(t testing.TB) *client {
 	t.Helper()
-	return newUserOn(t, shared)
-}
-
-// newUserOn is newUser against server s.
-func newUserOn(t testing.TB, s *server) *client {
-	t.Helper()
-	c := newClient(t, s)
-	r := follow(c, "tag", "concert", "1", "/")
+	c := newClient(t, shared)
+	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
+	r := setEventFollow(c, slug, "follow", "/")
 	assertRedirect(t, r, "/")
 	if c.cookie("session") == nil {
-		t.Fatalf("first POST /follow did not start an account (no session cookie)")
+		t.Fatalf("first POST /e/{slug}/follow did not start an account (no session cookie)")
 	}
-	assertRedirect(t, follow(c, "tag", "concert", "0", "/"), "/")
+	assertRedirect(t, setEventFollow(c, slug, "clear", "/"), "/")
 	return c
 }
 
@@ -230,14 +225,4 @@ func setEventFollow(c *client, slug, state, back string) resp {
 		form.Set("back", back)
 	}
 	return c.postForm("/e/"+slug+"/follow", form)
-}
-
-// follow posts a follow/unfollow toggle.
-func follow(c *client, kind, key, on, back string) resp {
-	c.t.Helper()
-	form := url.Values{"kind": {kind}, "key": {key}, "on": {on}}
-	if back != "" {
-		form.Set("back", back)
-	}
-	return c.postForm("/follow", form)
 }

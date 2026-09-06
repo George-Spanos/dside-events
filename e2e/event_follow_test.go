@@ -97,15 +97,13 @@ func TestHide_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	page := "/e/" + slug
 	alice := newUser(t)
 	bob := newUser(t)
-	assertRedirect(t, follow(alice, "tag", "exhibition", "1", "/following"), "/following")
 	assertListed(t, alice, "/upcoming", f.Title)
 	assertListed(t, alice, "/upcoming?tag=exhibition", f.Title)
-	assertListed(t, alice, "/following", f.Title)
 
 	assertRedirect(t, setEventFollow(alice, slug, "hide", page), page)
 
 	// Hidden from every list alice sees, the home page included.
-	for _, path := range []string{"/upcoming", "/upcoming?tag=exhibition", "/following", "/", "/?tag=exhibition"} {
+	for _, path := range []string{"/upcoming", "/upcoming?tag=exhibition", "/", "/?tag=exhibition"} {
 		assertNotListed(t, alice, path, f.Title)
 	}
 	// Her own event page says so and offers clear.
@@ -394,11 +392,10 @@ func TestRows_FollowToggleOnEveryList(t *testing.T) {
 	f.Tags = []string{"exhibition"}
 	slug := createEvent(t, asPoster(t, poster2), f)
 	alice := newUser(t)
-	assertRedirect(t, follow(alice, "poster", poster2.Slug, "1", "/following"), "/following")
 
 	// Full lists carry alice's row; the home page shows only the next ten,
 	// so there the check is "every row is a toggle", whatever the rows are.
-	fullLists := []string{"/upcoming", "/upcoming?tag=exhibition", "/following", "/p/" + poster2.Slug}
+	fullLists := []string{"/upcoming", "/upcoming?tag=exhibition", "/p/" + poster2.Slug}
 	pages := append([]string{"/", "/?tag=exhibition"}, fullLists...)
 
 	for _, path := range pages {
@@ -430,7 +427,6 @@ func TestRows_FollowToggleOnEveryList(t *testing.T) {
 
 	// Pressing the row toggle posts back to the list it was on.
 	assertRedirect(t, setEventFollow(alice, slug, "follow", "/upcoming?tag=exhibition"), "/upcoming?tag=exhibition")
-	assertRedirect(t, setEventFollow(alice, slug, "follow", "/following"), "/following")
 	assertRedirect(t, setEventFollow(alice, slug, "follow", "/p/"+poster2.Slug), "/p/"+poster2.Slug)
 	assertRedirect(t, setEventFollow(alice, slug, "follow", "/"), "/")
 
@@ -464,8 +460,7 @@ func TestRows_FollowToggleOnEveryList(t *testing.T) {
 	}
 
 	// The pressed button posts value="clear": the row unpresses, /mine empties.
-	assertRedirect(t, setEventFollow(alice, slug, "clear", "/following"), "/following")
-	assertRowToggle(t, "/following", rowFor(alice.get("/following").Body, slug), slug, false)
+	assertRedirect(t, setEventFollow(alice, slug, "clear", "/upcoming"), "/upcoming")
 	assertRowToggle(t, "/upcoming", rowFor(alice.get("/upcoming").Body, slug), slug, false)
 	assertNotContains(t, alice.get("/mine"), `href="/e/`+slug+`"`)
 	assertNotContains(t, alice.get("/"), "<h2>Mine</h2>")
@@ -492,7 +487,7 @@ func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 		}
 	}
 	// Past rows are never upcoming rows.
-	for _, path := range []string{"/upcoming", "/", "/following"} {
+	for _, path := range []string{"/upcoming", "/"} {
 		assertNotListed(t, alice, path, past.Title)
 	}
 }

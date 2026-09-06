@@ -2,14 +2,6 @@
 (function () {
   'use strict';
 
-  // Two forms are "the same" when action, kind and key match (several /follow forms share a page).
-  function same(a, b) {
-    return ['kind', 'key'].every(function (n) {
-      var x = a.elements[n], y = b.elements[n];
-      return (x ? x.value : '') === (y ? y.value : '');
-    });
-  }
-
   document.addEventListener('submit', function (e) {
     var form = e.target, btn = e.submitter;
     if (!form.matches('form[data-toggle]') || form.dataset.native || !btn || !window.fetch) return;
@@ -37,10 +29,7 @@
       .then(function (html) {
         if (!html) return;
         var doc = new DOMParser().parseFromString(html, 'text/html');
-        var fresh = Array.prototype.filter.call(
-          doc.querySelectorAll('form[action="' + key + '"]'),
-          function (f) { return same(form, f); }
-        )[0];
+        var fresh = doc.querySelector('form[action="' + key + '"]');
         if (fresh) { form.replaceWith(fresh); return; }
         // No matching form in the new page: the event left this list (hidden,
         // or unfollowed from Mine). Take the row with it; otherwise just unlock.

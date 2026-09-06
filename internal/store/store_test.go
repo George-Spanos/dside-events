@@ -131,46 +131,6 @@ func TestEventsAndFollows(t *testing.T) {
 	}
 }
 
-func TestFollowsAndFollowingFeed(t *testing.T) {
-	ctx := context.Background()
-	s := openTest(t)
-	p1, _, _ := s.CreatePoster(ctx, "One", "one")
-	p2, _, _ := s.CreatePoster(ctx, "Two", "two")
-	u, _, _ := s.CreateUser(ctx)
-	start := time.Now().Add(24 * time.Hour)
-	s.CreateEvent(ctx, p1.ID, "a", EventInput{Title: "A", StartsAt: start, Venue: "v", Tags: []string{"film"}})
-	s.CreateEvent(ctx, p2.ID, "b", EventInput{Title: "B", StartsAt: start, Venue: "v", Tags: []string{"talk"}})
-	s.CreateEvent(ctx, p2.ID, "c", EventInput{Title: "C", StartsAt: start, Venue: "v", Tags: []string{"film"}})
-
-	following, _ := s.Feed(ctx, FeedOpts{From: time.Now(), ViewerID: u.ID, FollowingOnly: true})
-	if len(following) != 0 {
-		t.Fatalf("nothing followed but %d events", len(following))
-	}
-	if err := s.FollowTag(ctx, u.ID, "film"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.FollowTag(ctx, u.ID, "film"); err != nil { // idempotent
-		t.Fatal(err)
-	}
-	if err := s.FollowPoster(ctx, u.ID, p2.ID); err != nil {
-		t.Fatal(err)
-	}
-	f, err := s.Follows(ctx, u.ID)
-	if err != nil || !f.HasTag("film") || !f.HasPoster(p2.ID) || f.HasPoster(p1.ID) {
-		t.Fatalf("follows: %v %+v", err, f)
-	}
-	following, _ = s.Feed(ctx, FeedOpts{From: time.Now(), ViewerID: u.ID, FollowingOnly: true})
-	if len(following) != 3 { // A by tag, B by poster, C by both (no duplicates)
-		t.Fatalf("following feed len = %d", len(following))
-	}
-	s.UnfollowTag(ctx, u.ID, "film")
-	s.UnfollowPoster(ctx, u.ID, p2.ID)
-	f, _ = s.Follows(ctx, u.ID)
-	if f.Any() {
-		t.Fatalf("still following: %+v", f)
-	}
-}
-
 func TestKeysAndPosters(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
@@ -246,15 +206,11 @@ func TestSessions(t *testing.T) {
 		t.Fatal("deleted session accepted")
 	}
 	s.CreateSession(ctx, "tok2", u.ID, time.Now().Add(time.Hour))
-	s.FollowTag(ctx, u.ID, "film")
 	s.DeleteAccount(ctx, u.ID)
 	if _, err := s.AccountBySession(ctx, "tok2"); err != ErrNotFound {
 		t.Fatal("session survived account delete")
 	}
 	if _, err := s.AccountByKey(ctx, key); err != ErrNotFound {
 		t.Fatal("key survived account delete")
-	}
-	if f, err := s.Follows(ctx, u.ID); err != nil || f.Any() {
-		t.Fatalf("follows survived account delete: %v %+v", err, f)
 	}
 }

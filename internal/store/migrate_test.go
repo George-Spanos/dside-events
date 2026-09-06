@@ -53,8 +53,11 @@ func TestMigrateFromSchema1(t *testing.T) {
 	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'interests'").Scan(&n); err != nil || n != 0 {
 		t.Fatalf("interests table still present (%d, %v)", n, err)
 	}
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('follows_tags', 'follows_posters')").Scan(&n); err != nil || n != 0 {
+		t.Fatalf("follows_tags/follows_posters tables still present (%d, %v)", n, err)
+	}
 	var v int
-	if err := s.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_version").Scan(&v); err != nil || v != 2 {
-		t.Fatalf("schema_version = %d (%v), want 2", v, err)
+	if err := s.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_version").Scan(&v); err != nil || v != 3 {
+		t.Fatalf("schema_version = %d (%v), want 3", v, err)
 	}
 }

@@ -24,19 +24,12 @@ func (s *Server) secretLink(w http.ResponseWriter, r *http.Request) error {
 	return redirect(w, r, "/mine")
 }
 
-type tagFollowRow struct {
-	Tag       string
-	Following bool
-}
-
 type accountPage struct {
 	Base
-	Link    string // the secret link; "" without a session
-	Poster  bool
-	Slug    string
-	Tags    []tagFollowRow
-	Posters []store.Account
-	Error   string
+	Link   string // the secret link; "" without a session
+	Poster bool
+	Slug   string
+	Error  string
 }
 
 func (s *Server) accountData(r *http.Request, acct *store.Account) (accountPage, error) {
@@ -48,14 +41,7 @@ func (s *Server) accountData(r *http.Request, acct *store.Account) (accountPage,
 	if err != nil {
 		return p, err
 	}
-	follows, err := s.store.Follows(r.Context(), acct.ID)
-	if err != nil {
-		return p, err
-	}
-	p.Link, p.Poster, p.Slug, p.Posters = s.cfg.secretLink(key), acct.IsPoster(), acct.Slug, follows.Posters
-	for _, t := range tags {
-		p.Tags = append(p.Tags, tagFollowRow{Tag: t, Following: follows.HasTag(t)})
-	}
+	p.Link, p.Poster, p.Slug = s.cfg.secretLink(key), acct.IsPoster(), acct.Slug
 	return p, nil
 }
 

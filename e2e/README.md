@@ -7,7 +7,7 @@ the way a browser with JavaScript disabled would: no redirect following, one
 cookie jar per persona, form posts as `application/x-www-form-urlencoded`.
 
 There is no email and no login form anywhere. An account is a cookie that
-appears on the first Follow (of an event, a tag or a curator); it travels between devices by a
+appears on the first Follow of an event; it travels between devices by a
 secret link (`/k/{key}`); posters log in with the secret link the CLI prints.
 
 ## Run
@@ -26,8 +26,8 @@ title / lacks my other title", never exact counts, so tests do not interfere
 with each other.
 
 Because the shared server accumulates events, "the list shows my event" is
-asserted on `/upcoming` (all upcoming events), `/upcoming?tag=x` or
-`/following` through `assertListed(t, c, path, title)` /
+asserted on `/upcoming` (all upcoming events) or `/upcoming?tag=x` through
+`assertListed(t, c, path, title)` /
 `assertNotListed`, never on `/`: the home page shows only the next ten, so a
 title created by a test may legitimately be beyond the tenth. Home-page tests
 (`home_test.go`) instead post events about a thousand days out, so they are
@@ -42,7 +42,7 @@ last by date whatever else exists, and check row counts inside the
 | start | `<bin> serve` with env `ADDR=127.0.0.1:0 DB_PATH=…` (nothing else); waits for the single stdout line `listening on http://127.0.0.1:PORT`, then polls `/healthz` until 200 |
 | seed | after the server is up: `<bin> add-poster -name "Maria P."` and `-name "Nikos K."` with env `DB_PATH=… BASE_URL=http://127.0.0.1:PORT`; parses the two stdout lines `poster <slug>` and `link <BASE_URL>/k/<key>` |
 | poster login | fresh client, `GET /k/<key>` → must be 303 `/mine` with a `session` cookie (`asPoster`) |
-| user | fresh client whose first `POST /follow` creates the account and the cookie, then unfollows (`newUser`) |
+| user | fresh client whose first `POST /e/{slug}/follow` creates the account and the cookie, then clears that follow (`newUser`) |
 | secret link | `GET /account`, parse `href="…/k/([A-Za-z0-9_-]{43})"` (`secretLink`); links are opened by path so any `BASE_URL` works (`openLink`) |
 | stop | SIGTERM, `Kill` after 5 s, temp dir removed |
 
@@ -61,19 +61,17 @@ Both CLI commands work while the server runs (WAL + busy_timeout). Keys are
 
 | Method | Path | Who | Result |
 |---|---|---|---|
-| GET | `/`, `/?tag={tag}` | anyone | home: `<body class="wide">`, filters row (always includes `following`; unknown tag → 404), then `<div class="columns">` with `<section class="mine">` (only with a session AND ≥1 upcoming followed event: `<h2>Mine</h2>`, at most 10 soonest, `<a href="/mine">All of mine →</a>`) before `<section class="upcoming">` (`<h2>Upcoming</h2>`, the next 10 upcoming from Athens midnight today, `hidden` events left out, `<a href="/upcoming{?tag=…}">All upcoming events →</a>`); the 10 is hardcoded, no paging |
+| GET | `/`, `/?tag={tag}` | anyone | home: `<body class="wide">`, filters row (unknown tag → 404), then `<div class="columns">` with `<section class="mine">` (only with a session AND ≥1 upcoming followed event: `<h2>Mine</h2>`, at most 10 soonest, `<a href="/mine">All of mine →</a>`) before `<section class="upcoming">` (`<h2>Upcoming</h2>`, the next 10 upcoming from Athens midnight today, `hidden` events left out, `<a href="/upcoming{?tag=…}">All upcoming events →</a>`); the 10 is hardcoded, no paging |
 | GET | `/upcoming`, `/upcoming?tag={tag}` | anyone | 200, h1 "Upcoming", `<title>Upcoming · dside events</title>`; ALL upcoming events grouped by day, one column, same filters row; unknown tag → 404; with a session leaves out `hidden` events |
-| GET | `/following` | anyone | 200; all upcoming narrowed to followed tags OR posters; no session / nothing followed → "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page." |
 | GET | `/mine` | anyone | 200; Upcoming (asc), Past (desc), Hidden ("Events you hid. They stay out of your feed.", each row with a "Show again" `state=clear` button); no session / nothing followed or hidden → h1 "Mine" + "Nothing here yet. Follow an event and it shows up here." |
 | GET | `/e/{slug}` | anyone | event page, identical for anon and user: Follow / Hide buttons + counter; the pressed one reads `Following` / `Hidden` with `aria-pressed="true"` (`data-on`/`data-off`, the check mark is CSS), a hidden event adds "Hidden from your feed."; owner: Edit link + Delete form; past: "This event has passed.", no buttons; no login link |
 | POST | `/e/{slug}/follow` | anyone | no session → creates `Account{role user}` + session, sets cookie, then acts; `state=follow\|hide\|clear` (follow → `following`, hide → `hidden`, clear → row deleted), `back`; 303 → `back` (local path only) else `/e/{slug}`; bad state → 400; unknown slug → 404 |
-| GET | `/p/{slug}` | anyone | poster name, follow toggle (everyone), Upcoming then Past lists; not a poster → 404 |
-| POST | `/follow` | anyone | lazy account as above; `kind=tag\|poster`, `key`, `on=1\|0`, `back`; 303; unknown key → 404 (no account created); idempotent |
+| GET | `/p/{slug}` | anyone | poster name, Upcoming then Past lists; not a poster → 404 |
 | GET | `/k/{key}` | anyone | valid → new session for that account (also when another cookie is present: switches), `Set-Cookie: session=…; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`, 303 `/mine`; unknown → 404 "This link doesn't work. It may have been replaced with a new one." |
-| GET | `/account` | anyone | 200, two variants. No session: h1 "Account" + "This device has no list yet. Follow an event, a tag or a curator, and your account starts here. No sign-up, no email." + "Opened a secret link before? Open it again on this device to continue there." With session: `<h2>Your secret link</h2>` `<a href="{link}">{link}</a>`, form `/account/key` "Get a new link", `<h2>Following</h2>` toggles, `<h2>This device</h2>` form `/forget` "Forget this device", `<h2>Delete account</h2>` "Deletes your account, your follows and your hidden events. It can't be undone." + form with `confirm` (posters: "Your curator page: …" and "removed by hand" instead) |
+| GET | `/account` | anyone | 200, two variants. No session: h1 "Account" + "This device has no list yet. Follow an event and your account starts here. No sign-up, no email." + "Opened a secret link before? Open it again on this device to continue there." With session: `<h2>Your secret link</h2>` `<a href="{link}">{link}</a>`, form `/account/key` "Get a new link", `<h2>This device</h2>` form `/forget` "Forget this device", `<h2>Delete account</h2>` "Deletes your account, your follows and your hidden events. It can't be undone." + form with `confirm` (posters: "Your curator page: …" and "removed by hand" instead) |
 | POST | `/account/key` | session | rotate key, 303 `/account`; old link → 404, existing sessions untouched; no session → 303 `/account`; GET → 405 |
 | POST | `/forget` | session | delete the session row, clear cookie, 303 `/`; account and data stay, link restores them; no session → 303 `/account`; GET → 405 |
-| POST | `/account/delete` | session user | `confirm=1` required (else 422); poster → 403 "by hand"; 303 `/`; cascades sessions, event follows, tag/curator follows, key (link → 404); no session → 303 `/account` |
+| POST | `/account/delete` | session user | `confirm=1` required (else 422); poster → 403 "by hand"; 303 `/`; cascades sessions, event follows, key (link → 404); no session → 303 `/account` |
 | GET/POST | `/new` | poster | event form; non-poster incl. anon → 403; OK → 303 `/e/{slug}`; invalid → 422 re-render with values and `role="alert"`; duplicate (same poster, normalised title, Athens day) → 422 "already posted" |
 | GET/POST | `/e/{slug}/edit` | owner | prefilled; slug never changes; other poster / user / anon → 403; unknown → 404 |
 | POST | `/e/{slug}/delete` | owner | hard delete with cascade, 303 `/`; slug → 404 afterwards; others → 403 |
@@ -87,7 +85,7 @@ Both CLI commands work while the server runs (WAL + busy_timeout). Keys are
 Nav is always `mine · account` (+ `new` for posters); no page links to a
 login. Read pages never redirect and never set a cookie.
 
-List rows (`/` both columns, `/upcoming`, `/following`, `/mine` Upcoming,
+List rows (`/` both columns, `/upcoming`, `/mine` Upcoming,
 `/p/{slug}` Upcoming) are `<li>` inside `<ul class="events">`:
 `<time>`, `<a href="/e/{slug}">`, and one toggle form
 `<form method="post" action="/e/{slug}/follow" …>` with hidden
@@ -126,7 +124,7 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 The weed phase greps these against `^rule|^surface|^invariant` in the spec to
 find uncovered obligations. Home-page assertions cite `Home` (and its
 guarantees as `Home.TenAtMost`, `Home.SideBySide`, the config as
-`home_list_size`); `/upcoming` and `/following` assertions cite
+`home_list_size`); `/upcoming` assertions cite
 `UpcomingAll`, which replaced the former `Feed` surface.
 
 ## Not black-box testable
@@ -146,12 +144,11 @@ guarantees as `Home.TenAtMost`, `Home.SideBySide`, the config as
 | `main_test.go` | `TestMain`: build, temp dir, shared server, seed posters via `add-poster` (server first, then CLI with `BASE_URL`), teardown |
 | `harness_test.go` | `server`, `startServer`, `launchServer`, `waitHealthy`, `runCLI`, `addPoster`/`addPosterRaw`, `posterLink`, `parseLink` |
 | `client_test.go` | `client` (cookie jar, no redirects), `get`/`postForm`/`follow`/`cookie`/`setRawCookie`, `sessionSetCookie`, assertions incl. `assertCopy`, `assertSessionCookieFlags`, `assertListed`/`assertNotListed`, HTML helpers incl. `eventRows`/`rowsFor`/`rowFor`/`slugOf`/`section` |
-| `fixtures_test.go` | `uid`/`uniqTitle`/`uniqSlug`, `asPoster`/`newUser`/`openLink`/`secretLink`/`keyPath`/`randomKey`, `eventForm`/`validEvent`/`createEvent`, `tomorrow`/`yesterday`, `followerCount`, `setEventFollow`, `follow` |
+| `fixtures_test.go` | `uid`/`uniqTitle`/`uniqSlug`, `asPoster`/`newUser`/`openLink`/`secretLink`/`keyPath`/`randomKey`, `eventForm`/`validEvent`/`createEvent`, `tomorrow`/`yesterday`, `followerCount`, `setEventFollow` |
 | `browse_test.go` | `/upcoming` list, tag filters on `/upcoming` and `/`, event and poster pages, anonymous event page with buttons, 403/200 route table |
 | `home_test.go` | home page: Upcoming column of at most ten with the "All upcoming events →" link (also filtered), the eleventh-plus on `/upcoming` only, Mine column present/absent, `<body class="wide">` only on `/`, `/upcoming` h1/title/tag filter/404, `<h3 class="day">` headings with bold weekday |
 | `secret_test.go` | lazy account creation, cookie flags, no-session read pages, account page with link and forms, open / unknown / switch link, rotate, forget, session-less POSTs, login routes gone, poster link login, `poster-link` CLI |
-| `account_test.go` | follows on the account page, poster variant, self-deletion (data, sessions, link), confirm, poster 403 |
+| `account_test.go` | account page poster variant, self-deletion (data, sessions, link), confirm, poster 403 |
 | `events_test.go` | create/edit/delete, validation, duplicates, slugs, owner checks, `add-poster` CLI (link, no-op for existing slug, unique slugs/keys) |
-| `follow_test.go` | tag/poster follow toggles, anon follow from a poster page, `/following` semantics incl. anon 200 |
 | `event_follow_test.go` | follow / hide / clear (`FollowEvent`, `HideEvent`, `UnfollowEvent`), `follower_count`, `/mine` incl. the Hidden section, anon Follow starts an account, row toggles on every list (`assertRowToggle`), past rows without a toggle, pressed Following / Hidden buttons on the event page (`HiddenIsPrivate`) |
 | `pwa_test.go` | manifest, service worker, static assets, 404/405, no-JS guarantees (every mutation 303, forms well-formed, `/k/` is the one state-changing GET) |

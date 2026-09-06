@@ -111,11 +111,10 @@ func (s *Store) EventBySlug(ctx context.Context, slug string, viewerID int64) (*
 
 // FeedOpts filters the public feed.
 type FeedOpts struct {
-	From          time.Time // include events starting at or after this instant
-	Tag           string    // optional tag filter
-	ViewerID      int64     // 0 for anonymous; leaves out the viewer's hidden events
-	FollowingOnly bool      // only events from followed tags or followed posters
-	Limit         int       // at most this many rows; 0 means all
+	From     time.Time // include events starting at or after this instant
+	Tag      string    // optional tag filter
+	ViewerID int64     // 0 for anonymous; leaves out the viewer's hidden events
+	Limit    int       // at most this many rows; 0 means all
 }
 
 // Feed lists upcoming events in chronological order.
@@ -126,11 +125,6 @@ func (s *Store) Feed(ctx context.Context, o FeedOpts) ([]Event, error) {
 	if o.Tag != "" {
 		where += " AND EXISTS (SELECT 1 FROM event_tags t WHERE t.event_id = e.id AND t.tag = ?)"
 		args = append(args, o.Tag)
-	}
-	if o.FollowingOnly {
-		where += ` AND (EXISTS (SELECT 1 FROM follows_tags ft JOIN event_tags t ON t.tag = ft.tag WHERE ft.account_id = ? AND t.event_id = e.id)
-    OR EXISTS (SELECT 1 FROM follows_posters fp WHERE fp.account_id = ? AND fp.poster_id = e.poster_id))`
-		args = append(args, o.ViewerID, o.ViewerID)
 	}
 	where += " ORDER BY e.starts_at ASC, e.id ASC"
 	if o.Limit > 0 {

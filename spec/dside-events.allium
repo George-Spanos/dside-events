@@ -1,7 +1,7 @@
 -- allium: 3
 -- dside-events: event discovery for Athens. Text-only events posted by
 -- whitelisted curators ("posters"); attendees hold anonymous accounts that
--- start in a cookie on their first Follow (event, tag or curator) and travel
+-- start in a cookie on their first Follow of an event and travel
 -- to another device through a secret link. No email, no sign-up. Anonymous visitors browse.
 -- Source of truth for product intent: PROJECT.md.
 
@@ -61,8 +61,6 @@ entity Account {
     sessions: Session with account = this
     events: Event with poster = this
     event_follows: EventFollow with account = this
-    tag_follows: TagFollow with follower = this
-    poster_follows: PosterFollow with follower = this
 
     -- Projections
     active_sessions: sessions where status = active
@@ -123,20 +121,6 @@ entity EventFollow {
     updated_at: Timestamp
 }
 
-entity TagFollow {
-    -- Fields
-    follower: Account
-    tag: Tag
-    created_at: Timestamp
-}
-
-entity PosterFollow {
-    -- Fields
-    follower: Account
-    poster: Account
-    created_at: Timestamp
-}
-
 ------------------------------------------------------------
 -- Config
 ------------------------------------------------------------
@@ -163,7 +147,7 @@ config {
 
 -- Accounts and sessions -----------------------------------
 
--- An account starts on the visitor's first Follow (event, tag or curator)
+-- An account starts on the visitor's first Follow of an event
 -- or first Hide. The surfaces that offer those actions to a visitor without
 -- a session offer StartAccount alongside them; the implementation performs
 -- both in the same request.
@@ -184,9 +168,9 @@ rule StartAccount {
         )
         SessionIssued(visitor: visitor, session: session)
     @guidance
-        -- HTTP: fired by POST /e/{slug}/follow and POST /follow when the
-        -- request carries no valid session cookie; the event-follow or follow
-        -- rule then applies to the new account in the same request, and the
+        -- HTTP: fired by POST /e/{slug}/follow when the request carries no
+        -- valid session cookie; the event-follow rule then applies to the new
+        -- account in the same request, and the
         -- response is the same 303 an existing account gets. SessionIssued is
         -- the Set-Cookie: session cookie, HttpOnly, SameSite=Lax, Path=/,
         -- Secure when configured, config.session_duration long. No other
@@ -407,48 +391,6 @@ rule UnfollowEvent {
         -- 404. Clearing when nothing is set is a no-op.
 }
 
--- Following tags and curators -----------------------------
-
-rule FollowTag {
-    when: FollowTag(account, tag)
-    let existing = TagFollow{follower: account, tag: tag}
-    ensures:
-        if not exists existing:
-            TagFollow.created(follower: account, tag: tag, created_at: now)
-    @guidance
-        -- HTTP: POST /follow with kind=tag, key=<tag>, on=1, back; 303 to back
-        -- when local, otherwise to /. A key outside the Tag enumeration
-        -- answers 404. Idempotent. Without a session StartAccount runs first
-        -- in the same request.
-}
-
-rule UnfollowTag {
-    when: UnfollowTag(account, tag)
-    ensures: not exists TagFollow{follower: account, tag: tag}
-    @guidance
-        -- HTTP: POST /follow with kind=tag, key=<tag>, on=0. Idempotent.
-}
-
-rule FollowPoster {
-    when: FollowPoster(account, target)
-    requires: target.is_poster
-    let existing = PosterFollow{follower: account, poster: target}
-    ensures:
-        if not exists existing:
-            PosterFollow.created(follower: account, poster: target, created_at: now)
-    @guidance
-        -- HTTP: POST /follow with kind=poster, key=<poster slug>, on=1. A key
-        -- that is not a poster slug answers 404. Idempotent. Without a session
-        -- StartAccount runs first in the same request.
-}
-
-rule UnfollowPoster {
-    when: UnfollowPoster(account, target)
-    ensures: not exists PosterFollow{follower: account, poster: target}
-    @guidance
-        -- HTTP: POST /follow with kind=poster, key=<poster slug>, on=0. Idempotent.
-}
-
 -- Account -------------------------------------------------
 
 rule ChooseTheme {
@@ -475,10 +417,6 @@ rule DeleteAccount {
         for s in account.sessions:
             not exists s
         for f in account.event_follows:
-            not exists f
-        for f in account.tag_follows:
-            not exists f
-        for f in account.poster_follows:
             not exists f
         not exists account                                   -- the key goes with it: the secret link answers 404 afterwards
     @guidance
@@ -516,11 +454,6 @@ invariant OneFollowPerAccountEvent {
     for a in EventFollows:
         for b in EventFollows:
             a != b implies not (a.account = b.account and a.event = b.event)
-}
-
-invariant PosterFollowTargetsPoster {
-    for f in PosterFollows:
-        f.poster.is_poster
 }
 
 ------------------------------------------------------------
@@ -577,8 +510,6 @@ surface Home {
 
     provides:
         StartAccount(visitor) when visitor.session = null
-        FollowTag(account, tag) when account != null
-        UnfollowTag(account, tag) when account != null
         for e in upcoming_next:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
@@ -609,11 +540,8 @@ surface Home {
         -- upcoming followed event; otherwise the screen is Upcoming alone.
     @guidance
         -- HTTP: GET / and GET /?tag={tag}, 200 with or without a session;
-        -- unknown tag 404. The filters row (all · following · one link per
-        -- Tag) spans the full width above both columns; when a tag filter is
-        -- active the follow or unfollow toggle for that tag sits under it, and
-        -- a follow posted without a session fires StartAccount and then
-        -- FollowTag in the same request. Column Mine: heading "Mine", the rows
+        -- unknown tag 404. The filters row (all · one link per Tag) spans the
+        -- full width above both columns. Column Mine: heading "Mine", the rows
         -- of mine_next grouped by Athens day, then the link "All of mine →" to
         -- /mine. Column Upcoming: heading "Upcoming", the rows of
         -- upcoming_next grouped by Athens day, then the link "All upcoming
@@ -639,10 +567,6 @@ surface UpcomingAll {
     -- Upcoming events minus the ones this account hid; without an account
     -- nothing is hidden.
     let visible = upcoming where not follows.any(f => f.account = account and f.state = hidden)
-    -- The following view: visible events that carry a followed tag or come
-    -- from a followed poster; empty without an account.
-    let following = visible where TagFollows.any(f => f.follower = account and f.tag in tags)
-        or PosterFollows.any(f => f.follower = account and f.poster = poster)
 
     exposes:
         for e in visible:
@@ -655,23 +579,10 @@ surface UpcomingAll {
             e.tags
             e.poster.name
             e.poster.slug
-        for e in following:
-            e.slug
-            e.title
-            e.starts_at
-            e.venue
-            e.price
-            e.follower_count
-            e.tags
-            e.poster.name
-            e.poster.slug
 
     provides:
         StartAccount(visitor) when visitor.session = null
-        FollowTag(account, tag) when account != null
-        UnfollowTag(account, tag) when account != null
-        -- Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once); following is a subset of
-        -- visible, so its rows are covered here.
+        -- Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once).
         for e in visible:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
@@ -692,24 +603,15 @@ surface UpcomingAll {
         -- The feed can be narrowed to events carrying one tag from the Tag
         -- enumeration. A tag outside the enumeration is not a feed at all.
     @guarantee HiddenStaysHidden
-        -- An event the account hid appears in neither list until the hide is
+        -- An event the account hid does not appear until the hide is
         -- cleared; nobody else can tell it was hidden.
-    @guarantee FollowingIsUnion
-        -- The following view uses OR semantics: a followed tag or a followed
-        -- poster is enough for an event to appear.
     @guidance
         -- HTTP: GET /upcoming and GET /upcoming?tag={tag} render every event
-        -- in visible under the heading "Upcoming", unknown tag 404; GET
-        -- /following renders following. All three answer 200 with or without
-        -- a session; /following without follows shows "You're not following
-        -- anything yet. Pick a tag above and press Follow, or follow a curator
-        -- from an event page." The filter row is Home's, except that on
-        -- /upcoming its all and tag links stay on /upcoming; it always
-        -- includes following. When a tag filter is active the
-        -- follow or unfollow toggle for that tag sits under the filter links;
-        -- a follow posted without a session fires StartAccount and then
-        -- FollowTag in the same request. Events are grouped by Athens day in
-        -- ascending start order; the follower count is always shown, zero
+        -- in visible under the heading "Upcoming", unknown tag 404. Both
+        -- answer 200 with or without a session. The filter row is Home's,
+        -- except that its all and tag links stay on /upcoming. Events are
+        -- grouped by Athens day in ascending start order; the follower count
+        -- is always shown, zero
         -- included. Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once), pressed when the
         -- account follows the event; a press without a session fires
         -- StartAccount and then FollowEvent in the same request. This is the whole list
@@ -790,7 +692,6 @@ surface PosterPage {
     context curator: Account where role = poster
 
     let account = visitor.session?.account                   -- absent without a session
-    let follow = PosterFollow{follower: account, poster: curator}
     let upcoming = curator.events where is_upcoming
     let past = curator.events where not is_upcoming
 
@@ -816,8 +717,6 @@ surface PosterPage {
 
     provides:
         StartAccount(visitor) when visitor.session = null
-        FollowPoster(account, curator) when account != null and not exists follow and curator != account
-        UnfollowPoster(account, curator) when account != null and exists follow and curator != account
         for e in upcoming:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
@@ -837,10 +736,8 @@ surface PosterPage {
         -- HTTP: GET /p/{slug}; a slug that is not a poster's answers 404.
         -- Upcoming ascending, then Past descending. Upcoming rows carry the
         -- Follow toggle; past rows carry none and read "{n} followed" when the
-        -- count is not zero. The follow or unfollow
-        -- toggle posts to /follow with kind=poster and key=<slug>; a follow
-        -- without a session fires StartAccount and then FollowPoster in the
-        -- same request. A curator sees no follow toggle on their own page.
+        -- count is not zero. A press without a session fires StartAccount and
+        -- then FollowEvent in the same request.
 
 }
 
@@ -919,25 +816,13 @@ surface AccountPage {
     facing visitor: Visitor
 
     let account = visitor.session?.account                   -- absent without a session
-    let tag_follows = TagFollows where follower = account
-    let poster_follows = PosterFollows where follower = account
 
     exposes:
         account.key when account != null
         account.role when account != null
         account.slug when account != null and account.role = poster
-        for f in tag_follows:
-            f.tag
-        for f in poster_follows:
-            f.poster.name
-            f.poster.slug
 
     provides:
-        FollowTag(account, tag) when account != null
-        for f in tag_follows:
-            UnfollowTag(account, f.tag)
-        for f in poster_follows:
-            UnfollowPoster(account, f.poster)
         RotateSecretLink(account) when account != null
         ForgetDevice(visitor.session) when visitor.session != null
         DeleteAccount(account) when account != null and account.role = user
@@ -960,16 +845,14 @@ surface AccountPage {
         -- (see SecretLink).
     @guidance
         -- HTTP: GET /account, 200 in two states. Without a session: "This
-        -- device has no list yet. Follow an event, a tag or a curator, and
-        -- your account starts here. No sign-up, no email." and "Opened a
+        -- device has no list yet. Follow an event and your account starts
+        -- here. No sign-up, no email." and "Opened a
         -- secret link before? Open it again on this
         -- device to continue there." With a session: "Your secret link" as an
         -- absolute /k/{key} URL with "Open it on another device to see the
         -- same list there. Anyone with this link is you, so keep it to
         -- yourself." and a "Get a new link" form (hint "The old link stops
-        -- working."); Following with follow buttons for every Tag literal not
-        -- yet followed and unfollow buttons next to followed tags and posters;
-        -- "This device" with a "Forget this device" form ("Your list stays;
+        -- working."); "This device" with a "Forget this device" form ("Your list stays;
         -- the secret link brings it back."); and, for users, "Delete account"
         -- with confirm=1 and the note "Deletes your account, your follows and
         -- your hidden events. It can't be undone." A poster sees a link to
@@ -1079,11 +962,11 @@ open question "OQ-2 Event fields: title, start date+time, venue (required), pric
 open question "OQ-3 One post per event: is a duplicate defined as same poster + same normalised title + same Athens day, refused as already posted? (default: yes)"
 open question "OQ-4 Past start dates: may a poster create or edit an event that already started? (default: yes, within one year back and three years ahead, for backfill)"
 open question "OQ-5 Follow and hide: is the follower count public, and is hidden private to the account, keeping the event out of feeds until cleared from the event page or the Hidden section of /mine? (default: yes to both)"
-open question "OQ-6 Delete account: is self-deletion limited to role user, cascading sessions, event follows and tag/curator follows, with curators removed by hand? (default: yes)"
+open question "OQ-6 Delete account: is self-deletion limited to role user, cascading sessions and event follows, with curators removed by hand? (default: yes)"
 open question "OQ-7 Delete event: hard delete with cascade of event follows and a slug that answers 404 forever? (default: yes)"
 -- OQ-8 (one-time codes) withdrawn by the founder on 2026-09-06 together with the
 -- email-only account default: there is no email anywhere. Accounts are anonymous,
--- start in a cookie on the first Follow (event, tag or curator), and move between devices
+-- start in a cookie on the first Follow of an event, and move between devices
 -- through a secret link; posters log in with the secret link the CLI prints.
 open question "OQ-9 Sessions: fixed 365-day lifetime without sliding renewal, carried in an HttpOnly SameSite=Lax cookie, with the secret link as the only way back after the cookie is lost? (default: yes)"
 -- OQ-10 (CSRF) resolved with its default: a same-site session cookie plus a

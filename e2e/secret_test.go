@@ -10,10 +10,9 @@ const (
 	copyLinkBroken    = "This link doesn't work. It may have been replaced with a new one."
 	copyMineEmpty     = "Nothing here yet. Follow an event and it shows up here."
 	copyMineHidden    = "Events you hid. They stay out of your feed."
-	copyAccountNone   = "This device has no list yet. Follow an event, a tag or a curator, and your account starts here. No sign-up, no email."
+	copyAccountNone   = "This device has no list yet. Follow an event and your account starts here. No sign-up, no email."
 	copyAccountDelete = "Deletes your account, your follows and your hidden events. It can't be undone."
 	copyAccountAgain  = "Opened a secret link before? Open it again on this device to continue there."
-	copyFollowEmpty   = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
 )
 
 // spec: StartAccount, Visitor, Account, Session, session_duration, FollowEvent, EventDetail, MyEvents
@@ -63,32 +62,12 @@ func TestStartAccount_FollowEventFromAnonCreatesAccount(t *testing.T) {
 	}
 }
 
-// spec: StartAccount, Visitor, Account, Session, FollowTag, AccountPage, UpcomingAll
-func TestStartAccount_FollowFromAnonCreatesAccount(t *testing.T) {
-	f := validEvent(t, tomorrow())
-	f.Tags = []string{"exhibition"}
-	createEvent(t, asPoster(t, poster1), f)
-
-	v := anon(t)
-	r := follow(v, "tag", "exhibition", "1", "/following")
-	assertRedirect(t, r, "/following")
-	assertSessionCookieFlags(t, r)
-	if v.cookie("session") == nil {
-		t.Fatalf("no session cookie in jar after the first follow POST")
-	}
-
-	r = v.follow(r)
-	assertStatus(t, r, 200)
-	assertContains(t, r, f.Title)
-	r = v.get("/account")
-	assertStatus(t, r, 200)
-	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="exhibition"`, `value="0"`)
-	assertNoCopy(t, r, copyAccountNone)
-
-	// A follow that fails (unknown target) from a fresh visitor gives 404 and
+// spec: StartAccount, Visitor, FollowEvent
+func TestStartAccount_RejectedFollowLeavesNoAccount(t *testing.T) {
+	// A follow that fails (unknown event) from a fresh visitor gives 404 and
 	// must not leave a half-made account behind in the cookie.
 	w := anon(t)
-	r = follow(w, "tag", "opera", "1", "/")
+	r := setEventFollow(w, "no-such-event-2030-01-01", "follow", "/")
 	assertStatus(t, r, 404)
 	if w.cookie("session") != nil {
 		t.Errorf("a rejected follow POST left a session cookie")
@@ -125,10 +104,6 @@ func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 	assertCopy(t, r, copyMineEmpty)
 	assertNotContains(t, r, `href="/e/`)
 
-	r = v.get("/following")
-	assertStatus(t, r, 200)
-	assertCopy(t, r, copyFollowEmpty)
-
 	r = v.get("/account")
 	assertStatus(t, r, 200)
 	assertContains(t, r, "Account")
@@ -139,7 +114,7 @@ func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 	assertNoForm(t, r, `action="/forget"`)
 	assertNoForm(t, r, `action="/account/delete"`)
 
-	for _, path := range []string{"/", "/upcoming", "/mine", "/following", "/account"} {
+	for _, path := range []string{"/", "/upcoming", "/mine", "/account"} {
 		r := v.get(path)
 		assertStatus(t, r, 200)
 		if sessionSetCookie(r) != "" || v.cookie("session") != nil {
@@ -173,7 +148,6 @@ func TestAccount_WithSession_ShowsSecretLinkAndForms(t *testing.T) {
 	assertCopy(t, r, "Open it on another device to see the same list there. Anyone with this link is you, so keep it to yourself.")
 	assertForm(t, r, `action="/account/key"`, "Get a new link")
 	assertCopy(t, r, "The old link stops working.")
-	assertContains(t, r, "<h2>Following</h2>")
 	assertContains(t, r, "<h2>This device</h2>")
 	assertForm(t, r, `action="/forget"`, "Forget this device")
 	assertCopy(t, r, "Your list stays; the secret link brings it back.")
@@ -199,7 +173,6 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 
 	phone := newUser(t)
 	assertRedirect(t, setEventFollow(phone, slug, "follow", page), page)
-	assertRedirect(t, follow(phone, "tag", "film", "1", "/account"), "/account")
 	link, _ := secretLink(t, phone)
 
 	laptop := openLink(t, shared, link)
@@ -209,8 +182,6 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 	r := laptop.get("/mine")
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
-	r = laptop.get("/account")
-	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="film"`, `value="0"`)
 	link2, _ := secretLink(t, laptop)
 	if link2 != link {
 		t.Errorf("laptop sees link %q, phone %q; want the same account", link2, link)
@@ -354,7 +325,6 @@ func TestForgetDevice_ClearsCookie_KeepsAccount(t *testing.T) {
 	page := "/e/" + slug
 	u := newUser(t)
 	assertRedirect(t, setEventFollow(u, slug, "follow", page), page)
-	assertRedirect(t, follow(u, "tag", "film", "1", "/account"), "/account")
 	link, _ := secretLink(t, u)
 	old := u.cookie("session")
 
@@ -391,7 +361,6 @@ func TestForgetDevice_ClearsCookie_KeepsAccount(t *testing.T) {
 	again := openLink(t, shared, link)
 	r = again.get("/mine")
 	assertContains(t, r, f.Title)
-	assertForm(t, again.get("/account"), `action="/follow"`, `value="tag"`, `value="film"`, `value="0"`)
 	// A forgotten device that presses Follow starts a brand-new account.
 	assertRedirect(t, setEventFollow(u, slug, "follow", page), page)
 	if l, _ := secretLink(t, u); l == link {

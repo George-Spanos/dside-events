@@ -25,11 +25,10 @@ logs to stderr.
 |---|---|
 | `/`, `/?tag=x` | home: the next 10 upcoming events (a fixed founder decision, not a setting) next to the events you follow, side by side; "All upcoming events →" leads to the full list |
 | `/upcoming`, `/upcoming?tag=x` | all upcoming events, day-grouped |
-| `/following` | all upcoming events from the tags and curators you follow |
 | `/mine` | your Upcoming, Past and Hidden events |
 | `/e/{slug}` | one event; Follow / Hide, and how many follow it |
 | `/p/{slug}` | a curator's events |
-| `/account` | your secret link, follows, forget / delete |
+| `/account` | your secret link, forget / delete |
 
 Every upcoming row, on every page, carries the Follow toggle
 (`POST /e/{slug}/follow` with `state=follow|hide|clear`); a pressed one reads
@@ -39,12 +38,11 @@ Unknown `tag` values are 404. An event carries at most 3 links.
 | Route | Form fields |
 |---|---|
 | `POST /e/{slug}/follow` | `state` = `follow`, `hide` or `clear`; `back` |
-| `POST /follow` | `kind` = `tag` or `poster`; `key`; `on` = `1` or `0`; `back` |
 
 ## Accounts
 
 There is no sign-up and no email. Everyone browses; the first press of
-Follow (an event, a tag or a curator) creates an anonymous account and keeps it in a cookie
+Follow of an event creates an anonymous account and keeps it in a cookie
 (`session`, HttpOnly, SameSite=Lax, 365 days). The account page shows a
 **secret link** (`/k/<key>`): opening it on another device continues the same
 account there, and opening it while another account's cookie is present
@@ -120,7 +118,7 @@ printed inside the curators' secret links.
 ## Layout
 
     main.go config.go server.go errors.go templates.go auth.go   wiring, routing, middleware, sessions
-    handlers_*.go event_form.go slug.go tags.go                 HTTP handlers, validation (handlers_feed.go: home, upcoming, following, mine, event, poster)
+    handlers_*.go event_form.go slug.go tags.go                 HTTP handlers, validation (handlers_feed.go: home, upcoming, mine, event, poster)
     templates/                                                  html/template pages; _list.html is the one row markup, _filters.html the filter row
     static/                                                     style.css app.js sw.js manifest icon
     internal/store                                              SQLite (modernc.org/sqlite), migrations
@@ -135,9 +133,9 @@ printed inside the curators' secret links.
 
 - Every form works without JavaScript: success → 303, validation failure → 422
   with the submitted values, wrong role (including no account) → 403.
-- Follow (event, tag or curator) never needs a prior login: without a session it
+- Follow never needs a prior login: without a session it
   creates the account first, then acts. Read pages never redirect; without a session
-  `/mine`, `/following` and `/account` show an empty state.
+  `/mine` and `/account` show an empty state.
 - Times are stored as unix seconds (UTC) and shown in Europe/Athens.
 - Event URLs never change after publishing.
 

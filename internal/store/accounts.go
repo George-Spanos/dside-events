@@ -173,7 +173,7 @@ func (s *Store) PosterBySlug(ctx context.Context, slug string) (*Account, error)
 		"SELECT "+accountCols+" FROM accounts WHERE slug = ? AND role = 'poster'", slug))
 }
 
-// DeleteAccount removes the account; sessions, event follows and tag/curator follows cascade.
+// DeleteAccount removes the account; sessions and event follows cascade.
 func (s *Store) DeleteAccount(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM accounts WHERE id = ?", id)
 	return err

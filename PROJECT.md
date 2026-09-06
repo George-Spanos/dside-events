@@ -16,8 +16,7 @@ Most individuals just want to discover events that might interest them.
 - No images no videos. All content is text with links to external content (up to 3 links per event). ex musical content related to the event, link to a theater script brief etc.
 - No spam. A single post per event.
 - Events have tags. Tags are a specific defined list.
-- Users - Attendees - ability to follow tags and/or curators/artists.
-- Users - Attendees - anonymous accounts. The first Follow (event, tag or curator) creates the account in a cookie; no sign-up, no email, no personal data. A secret link on the account page carries it to another device. Lose the cookie and the link, lose the list.
+- Users - Attendees - anonymous accounts. The first Follow of an event creates the account in a cookie; no sign-up, no email, no personal data. A secret link on the account page carries it to another device. Lose the cookie and the link, lose the list.
 - Simple UI - essentially our app is 
   - a home page: the next 10 upcoming events, next to the ones you follow, side by side.
   - a full list of upcoming events.
@@ -29,8 +28,7 @@ Most individuals just want to discover events that might interest them.
 - One post per event; editing yes, reposting no. Slug/URL immutable.
 - Hiding an event stays private; nobody else sees it.
 - Following an event is public: the event shows how many follow it.
-- Posters are PUBLIC curators: their name is the trust signal, following a poster = following a
-  curator. Event pages show who posted.
+- Posters are PUBLIC curators: their name is the trust signal. Event pages show who posted.
 - No notifications. Users should open the app to see updates.
 - App should be a PWA.
 - Everyone browses without an account; pressing Follow starts one.

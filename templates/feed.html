@@ -1,6 +1,6 @@
-{{define "title"}}{{if eq .Path "/upcoming"}}Upcoming{{else}}Following{{end}} · dside events{{end}}
+{{define "title"}}Upcoming · dside events{{end}}
 {{define "content"}}
-{{if eq .Path "/upcoming"}}<h1>Upcoming</h1>{{end}}
+<h1>Upcoming</h1>
 {{template "filters" .}}
 {{if .List.Days}}{{template "daylist" .List}}{{else}}<p>{{.Empty}}</p>{{end}}
 {{end}}

@@ -42,7 +42,6 @@ func (s *Server) routes() http.Handler {
 
 	mux.HandleFunc("GET /{$}", h(s.home))
 	mux.HandleFunc("GET /upcoming", h(s.upcoming))
-	mux.HandleFunc("GET /following", h(s.following))
 	mux.HandleFunc("GET /mine", h(s.mine))
 	mux.HandleFunc("GET /e/{slug}", h(s.event))
 	mux.HandleFunc("GET /e/{slug}/edit", h(s.editForm))
@@ -50,7 +49,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /e/{slug}/delete", h(s.deleteEvent))
 	mux.HandleFunc("POST /e/{slug}/follow", h(s.followEvent))
 	mux.HandleFunc("GET /p/{slug}", h(s.poster))
-	mux.HandleFunc("POST /follow", h(s.follow))
 	mux.HandleFunc("GET /new", h(s.newForm))
 	mux.HandleFunc("POST /new", h(s.newSubmit))
 

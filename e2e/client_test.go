@@ -375,7 +375,7 @@ func containsFold(body, want string) bool {
 // ---- lists and rows ---------------------------------------------------------
 
 // assertListed wants the event titled title on the list page at path: an
-// upcoming list such as /upcoming, /upcoming?tag=x or /following. "/" is not
+// upcoming list such as /upcoming or /upcoming?tag=x. "/" is not
 // a list page for this purpose: it shows only the next ten events and the
 // shared server accumulates events across tests, so a title created here
 // may legitimately be beyond the tenth.
