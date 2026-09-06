@@ -102,6 +102,17 @@ Makefile; re-running prints `link (unchanged, …)` for curators that already ex
 The service has `restart: always`, so
 Watchtower pulls the new image and restarts the container on its own.
 
+Backups and schema changes:
+
+    make prod-backup                          # consistent snapshot (VACUUM INTO) copied to backups/
+    make prod-restore FILE=backups/events-<time>.db
+
+Schema changes are plain SQL files in `internal/store/migrations/NNN_name.sql`, applied
+in order by the server at startup and recorded in `schema_version`. Deploying a new
+image is how a migration runs in production: Watchtower restarts the container and
+the new binary applies whatever is pending before it serves. Never edit a migration
+that has been applied somewhere; add the next number. Take `make prod-backup` first.
+
 In both cases the SQLite database lives in the `events-data` volume at
 `/data/events.db`. `BASE_URL` must be the public address, because it is
 printed inside the curators' secret links.

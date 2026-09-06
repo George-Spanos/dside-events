@@ -328,7 +328,7 @@ var (
 
 // assertRowToggle checks one list row against the row-toggle contract: a
 // POST form to /e/{slug}/follow with a hidden back field and a single
-// state button that is either pressed (aria-pressed="true", the check mark is drawn by CSS,
+// Follow button that is either pressed (aria-pressed="true", the check mark is drawn by CSS,
 // value="clear") or not (Follow, aria-pressed="false",
 // value="follow"). Rows never offer hide; that lives on the event page.
 func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
@@ -351,8 +351,10 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 	if !strings.Contains(row, `name="back"`) {
 		fail(`lacks the hidden name="back" field`)
 	}
-	if strings.Contains(row, `value="hide"`) || strings.Contains(row, "Hide") {
-		fail("offers hide; that belongs to the event page only")
+	// Every row also offers Hide (founder, 2026-09-06): a plain state=hide
+	// button; hidden rows never appear in these lists, so it is never pressed.
+	if !strings.Contains(row, `value="hide"`) || !strings.Contains(row, ">Hide</button>") {
+		fail("lacks the Hide button")
 	}
 	if pressed {
 		for _, want := range []string{`value="clear"`, `aria-pressed="true"`} {
@@ -541,4 +543,27 @@ func TestEventPage_PressedButtonShowsCheck(t *testing.T) {
 			t.Errorf("%s sees a pressed button on the event page after alice's mark", name)
 		}
 	}
+}
+
+// spec: HideEvent, Home, UpcomingAll, MyEvents
+func TestRows_HideFromList_RemovesRowAndLandsInHidden(t *testing.T) {
+	p := asPoster(t, poster1)
+	f := validEvent(t, tomorrow())
+	slug := createEvent(t, p, f)
+	alice := newUser(t)
+	assertListed(t, alice, "/upcoming", f.Title)
+
+	// The row's own Hide button posts from the list and returns there.
+	r := alice.postForm("/e/"+slug+"/follow", url.Values{"state": {"hide"}, "back": {"/upcoming"}})
+	assertRedirect(t, r, "/upcoming")
+	assertNotListed(t, alice, "/upcoming", f.Title)
+	assertNotListed(t, alice, "/", f.Title)
+
+	// It sits in Hidden on /mine with the way back, and others still see it.
+	r = alice.get("/mine")
+	assertStatus(t, r, 200)
+	assertContains(t, r, "<h2>Hidden</h2>")
+	assertContains(t, r, f.Title)
+	assertContains(t, r, "Show again")
+	assertListed(t, anon(t), "/upcoming", f.Title)
 }

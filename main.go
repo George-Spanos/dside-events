@@ -5,6 +5,7 @@
 //	dside-events add-poster -name "Maria P." [-slug maria]
 //	dside-events poster-link -slug maria
 //	dside-events poster-links
+//	dside-events backup -to /data/backup.db
 package main
 
 import (
@@ -24,7 +25,7 @@ import (
 	"dside.studio/events/internal/store"
 )
 
-const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links"
+const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links | backup -to file"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -51,6 +52,8 @@ func run(args []string) error {
 		return posterLink(cfg, args[1:])
 	case "poster-links":
 		return posterLinks(cfg)
+	case "backup":
+		return backup(cfg, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q\n%s", args[0], usage)
 	}
@@ -210,5 +213,28 @@ func posterLinks(cfg Config) error {
 	for _, p := range posters {
 		fmt.Printf("poster %s %s\nlink %s\n", p.Slug, p.Name, cfg.secretLink(p.Key))
 	}
+	return nil
+}
+
+// backup snapshots the database into -to, safe while the server runs.
+func backup(cfg Config, args []string) error {
+	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
+	to := fs.String("to", "", "destination file (required)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *to == "" {
+		return errors.New("backup: -to is required")
+	}
+	st, ctx, cancel, err := openStore(cfg)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer st.Close()
+	if err := st.Backup(ctx, *to); err != nil {
+		return err
+	}
+	fmt.Printf("backup %s\n", *to)
 	return nil
 }

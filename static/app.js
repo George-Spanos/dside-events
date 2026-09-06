@@ -41,7 +41,11 @@
           doc.querySelectorAll('form[action="' + key + '"]'),
           function (f) { return same(form, f); }
         )[0];
-        if (fresh) form.replaceWith(fresh); else delete form.dataset.busy;
+        if (fresh) { form.replaceWith(fresh); return; }
+        // No matching form in the new page: the event left this list (hidden,
+        // or unfollowed from Mine). Take the row with it; otherwise just unlock.
+        var row = form.closest('.events li');
+        if (row) row.remove(); else delete form.dataset.busy;
       })
       .catch(function () { form.dataset.native = '1'; btn.click(); });
   });

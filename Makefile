@@ -13,7 +13,7 @@ CURATORS := "Katerina Spatharou" "George Spanos"
 NAME ?=
 SLUG ?=
 
-.PHONY: help build run poster poster-links test e2e check fmt vet docker-up docker-down docker-poster docker-poster-links prod-up prod-curators prod-poster-links clean
+.PHONY: help build run poster poster-links test e2e check fmt vet docker-up docker-down docker-poster docker-poster-links prod-up prod-curators prod-poster-links prod-backup prod-restore clean
 
 help: ## show this list
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -67,6 +67,19 @@ prod-curators: ## create the production curators (idempotent), print their secre
 
 prod-poster-links: ## list every production curator with their secret link, saved to curators.txt (gitignored)
 	$(PROD) exec -T events /dside-events poster-links | tee curators.txt
+
+prod-backup: ## snapshot the production database into backups/events-<UTC time>.db (safe while running)
+	@mkdir -p backups
+	$(PROD) exec -T events /dside-events backup -to /data/backup.db
+	$(PROD) cp events:/data/backup.db backups/events-$$(date -u +%Y%m%dT%H%M%SZ).db
+	@ls -1t backups | head -1
+
+prod-restore: ## replace the production database with a backup: make prod-restore FILE=backups/events-....db (stops the app briefly)
+	@test -f "$(FILE)" || { echo 'usage: make prod-restore FILE=backups/events-<time>.db'; exit 2; }
+	$(PROD) stop events
+	docker run --rm -v $$($(PROD) config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["volumes"]["events-data"]["name"])'):/data alpine sh -c 'rm -f /data/events.db /data/events.db-wal /data/events.db-shm'
+	$(PROD) cp "$(FILE)" events:/data/events.db
+	$(PROD) start events
 
 clean: ## remove the binary and the dev database
 	rm -rf bin $(DB_PATH) $(DB_PATH)-wal $(DB_PATH)-shm

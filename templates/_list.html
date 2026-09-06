@@ -17,6 +17,7 @@
     {{if .Back}}<form method="post" action="/e/{{.Slug}}/follow" data-toggle class="row-toggle">
       <input type="hidden" name="back" value="{{.Back}}">
       <button name="state" value="{{if .Following}}clear{{else}}follow{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if .Following}}Following{{else}}Follow{{end}}</button>
+      <button name="state" value="hide" class="linklike hide">Hide</button>
     </form>{{end}}
   </li>
   {{end}}

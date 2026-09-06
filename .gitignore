@@ -8,3 +8,4 @@ bin/
 
 # secret curator links written by make prod-curators / poster-link — never commit
 curators.txt
+backups/

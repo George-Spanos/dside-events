@@ -582,6 +582,8 @@ surface Home {
         for e in upcoming_next:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            HideEvent(account, e)
+                when account != null
             UnfollowEvent(account, e)
                 when account != null and e.follows.any(f => f.account = account and f.state = following)
         for e in mine_next:
@@ -618,7 +620,7 @@ surface Home {
         -- events →" to /upcoming (carrying ?tag= when filtered); that link is
         -- shown even when the list is empty, under the usual empty copy. The
         -- columns sit side by side when the screen has room and stack, Mine
-        -- first, when it does not. Every row carries the Follow toggle,
+        -- first, when it does not. Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once),
         -- labelled "Follow" until pressed, then "Following" with a check mark
         -- drawn by the stylesheet (aria-pressed) when the account follows the
         -- event; a press without a session fires StartAccount and then
@@ -668,11 +670,13 @@ surface UpcomingAll {
         StartAccount(visitor) when visitor.session = null
         FollowTag(account, tag) when account != null
         UnfollowTag(account, tag) when account != null
-        -- Every row carries the Follow toggle; following is a subset of
+        -- Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once); following is a subset of
         -- visible, so its rows are covered here.
         for e in visible:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            HideEvent(account, e)
+                when account != null
             UnfollowEvent(account, e)
                 when account != null and e.follows.any(f => f.account = account and f.state = following)
 
@@ -706,7 +710,7 @@ surface UpcomingAll {
         -- a follow posted without a session fires StartAccount and then
         -- FollowTag in the same request. Events are grouped by Athens day in
         -- ascending start order; the follower count is always shown, zero
-        -- included. Every row carries the Follow toggle, pressed when the
+        -- included. Every row carries the Follow toggle and a plain Hide link-button (a hidden event leaves the list at once), pressed when the
         -- account follows the event; a press without a session fires
         -- StartAccount and then FollowEvent in the same request. This is the whole list
         -- Home links to: no row limit, no pagination. Filters are plain text
@@ -817,6 +821,8 @@ surface PosterPage {
         for e in upcoming:
             FollowEvent(account, e)
                 when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            HideEvent(account, e)
+                when account != null
             UnfollowEvent(account, e)
                 when account != null and e.follows.any(f => f.account = account and f.state = following)
 
@@ -876,6 +882,8 @@ surface MyEvents {
         for e in upcoming:
             FollowEvent(account, e)
                 when not e.follows.any(f => f.account = account and f.state = following)
+            HideEvent(account, e)
+                when account != null
             UnfollowEvent(account, e)
                 when e.follows.any(f => f.account = account and f.state = following)
         for e in hidden:

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -153,5 +154,15 @@ func notFound(err error) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
+	return err
+}
+
+// Backup writes a consistent snapshot of the database to path (SQLite's
+// VACUUM INTO), replacing any file already there.
+func (s *Store) Backup(ctx context.Context, path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "VACUUM INTO ?", path)
 	return err
 }

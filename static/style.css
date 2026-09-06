@@ -103,7 +103,8 @@ h2 + .day { margin-top: 1rem; }
 .events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 1rem; }
 .meta span { display: block; }
 .events time { font-variant-numeric: tabular-nums; }
-.row-toggle { margin: 0; }
+.row-toggle { margin: 0; text-align: center; }
+.row-toggle .hide { display: block; margin: .35rem auto 0; font-size: .9375rem; color: var(--muted); }
 
 /* Event page */
 .desc p { white-space: pre-line; }
