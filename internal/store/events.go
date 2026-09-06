@@ -335,3 +335,59 @@ func (s *Store) CountEvents(ctx context.Context) (int64, error) {
 	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM events").Scan(&n)
 	return n, err
 }
+
+// seriesPick orders a series' dates so the first row is the one that stands
+// for the whole run in search: the next date at or after now, or the last one
+// when they have all passed. Bind now twice, after the earlier arguments.
+// alias is the events table's alias in the enclosing query.
+func seriesPick(alias string) string {
+	c := alias + ".starts_at"
+	return "ORDER BY (" + c + " >= ?) DESC, CASE WHEN " + c + " >= ? THEN " + c + " END ASC, " + c + " DESC"
+}
+
+// SeriesCanonicalSlug returns the slug of the date that represents seriesID.
+// Every other date of the run points at it with a canonical link, so search
+// engines index the run once instead of once per date.
+func (s *Store) SeriesCanonicalSlug(ctx context.Context, seriesID int64, now time.Time) (string, error) {
+	var slug string
+	err := s.db.QueryRowContext(ctx,
+		"SELECT e.slug FROM events e WHERE e.series_id = ? "+seriesPick("e")+" LIMIT 1",
+		seriesID, now.Unix(), now.Unix()).Scan(&slug)
+	if err != nil {
+		return "", notFound(err)
+	}
+	return slug, nil
+}
+
+// IndexableEvent is one event URL that stands for itself in search.
+type IndexableEvent struct {
+	Slug      string
+	UpdatedAt time.Time
+}
+
+// IndexableEvents lists every event that belongs in the sitemap: standalone
+// events, plus one date per series (see SeriesCanonicalSlug). The dates a
+// canonical link points away from are left out, because a sitemap carries
+// canonical URLs only.
+func (s *Store) IndexableEvents(ctx context.Context, now time.Time) ([]IndexableEvent, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT slug, updated_at FROM events WHERE series_id IS NULL
+UNION ALL
+SELECT e.slug, e.updated_at FROM events e WHERE e.series_id IS NOT NULL AND e.id =
+  (SELECT x.id FROM events x WHERE x.series_id = e.series_id `+seriesPick("x")+` LIMIT 1)
+ORDER BY 2 DESC`, now.Unix(), now.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []IndexableEvent
+	for rows.Next() {
+		var e IndexableEvent
+		var updated int64
+		if err := rows.Scan(&e.Slug, &updated); err != nil {
+			return nil, err
+		}
+		e.UpdatedAt = toTime(updated)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

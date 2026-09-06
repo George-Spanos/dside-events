@@ -33,7 +33,7 @@ type accountPage struct {
 }
 
 func (s *Server) accountData(r *http.Request, acct *store.Account) (accountPage, error) {
-	p := accountPage{Base: s.base(r)}
+	p := accountPage{Base: hidden(s.base(r), "Account")}
 	if acct == nil {
 		return p, nil
 	}

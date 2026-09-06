@@ -167,6 +167,27 @@ func (s *Store) Posters(ctx context.Context) ([]PosterLink, error) {
 	return out, rows.Err()
 }
 
+// PosterSlugs lists the slug of every curator with a public page, by name.
+// Unlike Posters it never touches the secret keys, so it is safe to call
+// from a public handler.
+func (s *Store) PosterSlugs(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT slug FROM accounts WHERE role = 'poster' AND slug IS NOT NULL AND slug != '' ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		out = append(out, slug)
+	}
+	return out, rows.Err()
+}
+
 // PosterBySlug returns the poster with the given slug.
 func (s *Store) PosterBySlug(ctx context.Context, slug string) (*Account, error) {
 	return scanAccount(s.db.QueryRowContext(ctx,

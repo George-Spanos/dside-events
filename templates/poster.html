@@ -1,4 +1,3 @@
-{{define "title"}}{{.Poster.Name}} · dside events{{end}}
 {{define "content"}}
 <h1>{{.Poster.Name}}</h1>
 {{if .Upcoming.Days}}{{template "daylist" .Upcoming}}{{else}}<p>No upcoming events from {{.Poster.Name}}.</p>{{end}}

@@ -18,9 +18,10 @@ type eventFormPage struct {
 }
 
 func (s *Server) formPage(r *http.Request, f *eventForm, e *store.Event) eventFormPage {
-	p := eventFormPage{Base: s.base(r), Form: f, Tags: tags, Weekdays: weekdays, Cancel: "/"}
+	p := eventFormPage{Base: hidden(s.base(r), "New event"), Form: f, Tags: tags, Weekdays: weekdays, Cancel: "/"}
 	if e != nil {
 		p.Edit, p.Slug, p.Cancel = true, e.Slug, "/e/"+e.Slug
+		p.Base = hidden(p.Base, "Edit event")
 	}
 	return p
 }
