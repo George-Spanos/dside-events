@@ -106,7 +106,14 @@ Watchtower pulls the new image and restarts the container on its own.
 Republishing the seed files after correcting them:
 
     make prod-reset-events                    # backs up first, then empties the events
-    make prod-seed FILE=seed/jazz-athens-2026-09.tsv
+    make prod-seed                            # publishes every seed/*.tsv
+
+`prod-seed` takes all of `seed/*.tsv` in one go, as one curator (`POSTER`,
+default `george-spanos`), and is safe to re-run: an event that already exists
+(same curator, title and day) comes back 422 and is reported as skipped, so
+nothing is created twice and nothing already posted is modified. Add
+`FILE=seed/<events>.tsv` to publish a single file. It exits non-zero if any
+file had a failure, after trying them all.
 
 `reset-events` deletes every event and every follow of one, and clears
 `retired_slugs` with them. Clearing the retirements is the point: an ordinary

@@ -69,11 +69,18 @@ prod-curators: ## create the production curators (idempotent), print their secre
 prod-poster-links: ## list every production curator with their secret link, saved to curators.txt (gitignored)
 	$(PROD) exec -T events /dside-events poster-links | tee curators.txt
 
-prod-seed: ## publish a TSV of events on production as a curator from curators.txt: make prod-seed FILE=seed/jazz-athens-2026-09.tsv [POSTER=george-spanos]
-	@test -f "$(FILE)" || { echo 'usage: make prod-seed FILE=seed/<events>.tsv [POSTER=george-spanos]'; exit 2; }
-	@link=$$(awk -v p="poster $(POSTER)" 'index($$0, p" ")==1 || $$0==p {getline; print $$2}' curators.txt | grep '^http' | tail -1); \
+prod-seed: ## publish every seed/*.tsv on production as a curator from curators.txt (FILE=seed/one.tsv for a single file, POSTER=george-spanos); safe to re-run, events that exist are skipped
+	@files="$(if $(FILE),$(FILE),$(sort $(wildcard seed/*.tsv)))"; \
+	test -n "$$files" || { echo 'no seed files: expected seed/*.tsv'; exit 2; }; \
+	for f in $$files; do test -f "$$f" || { echo "no such file: $$f"; exit 2; }; done; \
+	link=$$(awk -v p="poster $(POSTER)" 'index($$0, p" ")==1 || $$0==p {getline; print $$2}' curators.txt | grep '^http' | tail -1); \
 	test -n "$$link" || { echo "no secret link for $(POSTER) in curators.txt; run make prod-poster-links first"; exit 2; }; \
-	seed/seed.sh "$$link" "$(FILE)"
+	failed=0; \
+	for f in $$files; do \
+	  echo "== $$f"; \
+	  seed/seed.sh "$$link" "$$f" || failed=$$((failed+1)); \
+	done; \
+	test "$$failed" = 0 || { echo "$$failed file(s) had failures" >&2; exit 1; }
 
 reset-events: build ## delete every local event so a seed file can be published again (keeps curators)
 	DB_PATH=$(DB_PATH) $(BIN) reset-events -yes
