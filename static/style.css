@@ -183,12 +183,14 @@ button:not(.linklike) {
 button:not(.linklike):active { transform: scale(.97); transition-duration: 0s; }
 
 /* One change, not two: the check mark appears with the fill, in a slot that exists in
-   both states, so the button never changes width or weight. */
+   both states (zero width when unpressed, so the label sits centred and symmetric); the
+   button keeps one width and one weight. */
+button[aria-pressed] { min-width: 8.5em; text-align: center; }
 button[aria-pressed]::before {
-  content: ""; display: inline-block; width: 1.15em; opacity: 0;
-  transition: opacity var(--t) var(--ease);
+  content: "✓" / ""; display: inline-block; width: 0; opacity: 0; overflow: hidden; vertical-align: bottom;
+  transition: width var(--t) var(--ease), opacity var(--t) var(--ease);
 }
-button[aria-pressed="true"]::before { content: "✓" / ""; opacity: 1; }
+button[aria-pressed="true"]::before { width: 1.15em; opacity: 1; }
 button[aria-pressed="true"] { font-weight: inherit; }
 
 /* Hover is routine: pointer devices only, never touch. Links show the full underline at
