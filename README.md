@@ -29,6 +29,8 @@ logs to stderr.
 | `/e/{slug}` | one event; Follow / Hide, and how many follow it |
 | `/p/{slug}` | a curator's events |
 | `/account` | your secret link, forget / delete |
+| `/robots.txt` | crawl rules; everything but `/k/` is open, and it names the sitemap |
+| `/sitemap.xml` | the canonical URLs: both lists, one page per tag, per curator and per event |
 
 Both home columns always render; with no rows, My feed says why it is empty,
 which is also where a visitor without a session is told what Follow costs.
@@ -37,6 +39,17 @@ Every upcoming row, on every page, carries the Follow toggle
 (`POST /e/{slug}/follow` with `state=follow|hide|clear`); a pressed one reads
 `✓ Following`. Hiding is offered on every row and on the event page, and stays
 private. Unknown `tag` values are 404. An event carries at most 3 links.
+
+## Search
+
+Every page names the URL that should rank for it (`seo.go`). The same events
+appear on several paths, so: `/upcoming?tag=x` is the landing page for its tag
+and home with a tag points at it; one date of a repeating event stands for the
+run and its other dates point at that one, which is also the only date in the
+sitemap and the only one carrying the schema.org `Event`. Private pages, forms
+and errors carry `noindex`. Structured data only repeats what the page shows —
+no organizer (a curator posts a listing, they do not put the event on) and no
+price unless the free-text price holds one unambiguous number.
 
 | Route | Form fields |
 |---|---|

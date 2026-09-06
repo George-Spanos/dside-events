@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{block "title" .}}dside events{{end}}</title>
+<title>{{.Title}}</title>
+{{with .Description}}<meta name="description" content="{{.}}">{{end}}
+{{if .NoIndex}}<meta name="robots" content="noindex, follow">{{end}}
+{{with .Canonical}}<link rel="canonical" href="{{.}}">
+<meta property="og:url" content="{{.}}">{{end}}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="dside events">
+<meta property="og:title" content="{{.Title}}">
+{{with .Description}}<meta property="og:description" content="{{.}}">{{end}}
 <link rel="stylesheet" href="/static/style.css?v={{.Version}}">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg?v={{.Version}}" type="image/svg+xml">
@@ -12,6 +20,7 @@
 <meta name="theme-color" content="#FCF8EF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#272320" media="(prefers-color-scheme: dark)">
 <script src="/static/app.js?v={{.Version}}" defer></script>
+{{with .JSONLD}}<script type="application/ld+json">{{.}}</script>{{end}}
 </head>
 <body>
 <a href="#main" class="skip">Skip to events</a>

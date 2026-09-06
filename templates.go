@@ -22,6 +22,16 @@ type Base struct {
 	Path    string
 	Version string
 	Theme   string // "light" or "dark" when the visitor chose one; "" follows the system
+
+	// What search engines and link previews read. Title and Description are
+	// written for someone looking at a result, not at the app. Canonical is
+	// the absolute URL that should rank for this page; NoIndex keeps a page
+	// out of the index altogether.
+	Title       string
+	Description string
+	Canonical   string
+	NoIndex     bool
+	JSONLD      template.JS
 }
 
 // AccountView is what templates know about the viewer.

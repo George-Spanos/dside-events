@@ -98,7 +98,8 @@ func (s *Server) iconPNG(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) offline(w http.ResponseWriter, r *http.Request) error {
-	return s.render(w, r, http.StatusOK, "offline", struct{ Base }{Base{Path: r.URL.Path, Version: s.version}})
+	base := hidden(Base{Path: r.URL.Path, Version: s.version}, "Offline")
+	return s.render(w, r, http.StatusOK, "offline", struct{ Base }{base})
 }
 
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {

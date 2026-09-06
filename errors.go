@@ -58,6 +58,18 @@ type errorPage struct {
 	Message string // "" → the template's generic copy for Status
 }
 
+// errorTitle names an error page in the browser tab; error.html carries the
+// matching copy on the page itself.
+func errorTitle(status int) string {
+	switch status {
+	case http.StatusNotFound:
+		return "Page not found"
+	case http.StatusForbidden:
+		return "Not allowed"
+	}
+	return "Error"
+}
+
 // renderError writes the custom error page (plain text for 405).
 func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int) {
 	s.renderErrorMessage(w, r, status, "")
@@ -72,7 +84,8 @@ func (s *Server) renderErrorMessage(w http.ResponseWriter, r *http.Request, stat
 		fmt.Fprintln(w, http.StatusText(status))
 		return
 	}
-	if err := s.render(w, r, status, "error", errorPage{Base: s.base(r), Status: status, Message: message}); err != nil {
+	page := errorPage{Base: hidden(s.base(r), errorTitle(status)), Status: status, Message: message}
+	if err := s.render(w, r, status, "error", page); err != nil {
 		slog.Error("render error page", "err", err)
 		http.Error(w, http.StatusText(status), status)
 	}

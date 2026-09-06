@@ -201,9 +201,15 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	page := homePage{Base: s.base(r), Filters: s.filters("/", tag), Empty: empty, AllHref: "/upcoming"}
+	// Home with a tag is the full tag list cut to ten, so it hands its claim
+	// to that list rather than competing with it.
+	page := homePage{Base: s.seo(s.base(r), "Events in Athens", siteDesc, "/"), Filters: s.filters("/", tag),
+		Empty: empty, AllHref: "/upcoming"}
 	if tag != "" {
-		page.AllHref = "/upcoming?tag=" + url.QueryEscape(tag)
+		page.AllHref = tagPath("/upcoming", tag)
+		page.Base = s.seo(page.Base, tagTitle(tag), tagDesc(tag), page.AllHref)
+	} else {
+		page.JSONLD = s.siteJSONLD()
 	}
 	page.Upcoming = s.morph(s.groupByDay(toggleRows(events, back)))
 	if acct != nil {
@@ -232,7 +238,14 @@ func (s *Server) upcoming(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	page := feedPage{Base: s.base(r), Filters: s.filters("/upcoming", tag), Empty: empty,
+	// The tag views are the landing pages for "concerts in Athens" and its
+	// siblings, so each one is self-canonical and titled for that query.
+	pageTitle, desc := "Upcoming events in Athens", siteDesc
+	if tag != "" {
+		pageTitle, desc = tagTitle(tag), tagDesc(tag)
+	}
+	page := feedPage{Base: s.seo(s.base(r), pageTitle, desc, tagPath("/upcoming", tag)),
+		Filters: s.filters("/upcoming", tag), Empty: empty,
 		List: s.morph(s.groupByDay(toggleRows(events, r.URL.RequestURI())))}
 	return s.render(w, r, http.StatusOK, "feed", page)
 }
@@ -250,19 +263,20 @@ type minePage struct {
 func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
 	if acct == nil {
-		return s.render(w, r, http.StatusOK, "mine", minePage{Base: s.base(r), Empty: true})
+		return s.render(w, r, http.StatusOK, "mine", minePage{Base: hidden(s.base(r), "My feed"), Empty: true})
 	}
 	followed, err := s.store.FollowedEvents(r.Context(), acct.ID, "")
 	if err != nil {
 		return err
 	}
-	hidden, err := s.store.HiddenEvents(r.Context(), acct.ID)
+	hiddenEvents, err := s.store.HiddenEvents(r.Context(), acct.ID)
 	if err != nil {
 		return err
 	}
 	upcoming, past := s.splitPast(followed)
-	page := minePage{Base: s.base(r), Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))),
-		Past: rows(past), Hidden: rows(hidden), Empty: len(followed) == 0 && len(hidden) == 0}
+	page := minePage{Base: hidden(s.base(r), "My feed"),
+		Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))),
+		Past:     rows(past), Hidden: rows(hiddenEvents), Empty: len(followed) == 0 && len(hiddenEvents) == 0}
 	return s.render(w, r, http.StatusOK, "mine", page)
 }
 
@@ -282,6 +296,7 @@ type eventView struct {
 	Links       []store.Link
 	Past        bool
 	Poster      posterRef
+	SeriesID    int64
 	SeriesCount int
 }
 
@@ -299,11 +314,16 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	past := e.StartsAt.Before(s.midnight(time.Now()))
+	view := eventView{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price,
+		Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug},
+		SeriesID: e.SeriesID, SeriesCount: e.SeriesCount}
+	canonical := s.eventCanonical(r.Context(), view)
+	base := s.base(r)
+	base.Title, base.Description, base.Canonical = s.eventTitle(view), s.eventDesc(view), canonical
+	base.JSONLD = s.eventJSONLD(view, canonical)
 	page := eventPage{
-		Base: s.base(r),
-		Event: eventView{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price,
-			Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug},
-			SeriesCount: e.SeriesCount},
+		Base:  base,
+		Event: view,
 		Follow: FollowView{Action: "/e/" + e.Slug + "/follow", Back: "/e/" + e.Slug, State: e.ViewerState,
 			Count: e.Followers, Past: past, SeriesCount: e.SeriesCount},
 		CanEdit: acct != nil && acct.ID == e.PosterID,
@@ -329,7 +349,9 @@ func (s *Server) poster(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	upcoming, past := s.splitPast(events)
-	page := posterPage{Base: s.base(r), Poster: posterRef{p.Name, p.Slug},
+	desc := "Events in Athens posted by " + p.Name + " on dside events: dates, venues, prices and ticket links."
+	page := posterPage{Base: s.seo(s.base(r), p.Name+" · events in Athens", desc, "/p/"+p.Slug),
+		Poster:   posterRef{p.Name, p.Slug},
 		Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))), Past: rows(past)}
 	return s.render(w, r, http.StatusOK, "poster", page)
 }

@@ -401,7 +401,7 @@ func TestUpcoming_Page_TagFilter_Unknown404(t *testing.T) {
 	r := v.get("/upcoming")
 	assertStatus(t, r, 200)
 	assertContains(t, r, "<h1>Upcoming</h1>")
-	assertContains(t, r, "<title>Upcoming · dside events</title>")
+	assertContains(t, r, "<title>Upcoming events in Athens · dside events</title>")
 	assertContains(t, r, th.Title)
 	assertContains(t, r, co.Title)
 	assertNotContains(t, r, `href="/mine"`)

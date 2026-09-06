@@ -59,6 +59,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /forget", h(s.forget))
 	mux.HandleFunc("POST /theme", h(s.theme))
 
+	mux.HandleFunc("GET /robots.txt", s.robots)
+	mux.HandleFunc("GET /sitemap.xml", h(s.sitemap))
+
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /static/", s.static)
 	mux.HandleFunc("GET /manifest.webmanifest", s.manifest)
