@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dogville · dside events — motion preview</title>
+<style>
+/* ===== copy of static/style.css as served 2026-09-06 (incl. Kiosk block) ===== */
+:root{--bg:#FCF8EF;--fg:#2E2823;--muted:#6C6157;--link:#875800;--error:#B5261A;--rule:#E2D9C9;--measure:68ch;--sans:ui-rounded,"Trebuchet MS",Ubuntu,"Segoe UI",Roboto,"Noto Sans",sans-serif;color-scheme:light dark;font:106.25%/1.5 var(--sans)}
+@media (prefers-color-scheme:dark){:root{--bg:#272320;--fg:#F1EADF;--muted:#B8AC9D;--link:#E9B653;--error:#FF9585;--rule:#4B433B}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0 auto;padding:0 1rem 2rem;max-width:var(--measure);background:var(--bg);color:var(--fg);overflow-wrap:anywhere}
+h1,h2,p,ul,form,fieldset,hr,div.desc{margin:0 0 1rem}h1{font-size:1.5rem;line-height:1.25}
+h2{font-size:1rem;margin-top:1.5rem;padding-bottom:.25rem;border-bottom:1px solid var(--rule)}
+h3{font-size:1rem;margin:1.5rem 0 .5rem}body.wide{max-width:110ch}
+a{color:var(--link);text-decoration:underline;text-underline-offset:.15em}
+[aria-current]{font-weight:bold;text-decoration:none}[aria-current] a{color:inherit;text-decoration:none}
+hr{border:0;border-top:1px solid var(--rule)}small,.muted,.hint,.count{color:var(--muted)}small,.hint{font-size:.9375rem}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.25rem 1rem;padding:1rem 0;margin-bottom:1rem;border-bottom:1px solid var(--rule)}
+header h1,header .brand{font-size:1.25rem;font-weight:bold;margin:0}header nav,.filters{line-height:1.75}.filters{margin-bottom:1rem}footer{margin-top:3rem}
+.events,.links,.past,.curators{list-style:none;padding:0}
+.columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(24rem,100%),1fr));gap:0 3rem}
+.day{font-size:1rem;font-weight:normal;margin:2rem 0 .5rem;padding-bottom:.25rem;border-bottom:1px solid var(--rule)}.day b{font-weight:bold}h2+.day{margin-top:1rem}
+.events li{display:grid;grid-template-columns:6ch 1fr auto;align-items:start;margin-bottom:1rem}.meta span{display:block}.events time{font-variant-numeric:tabular-nums}.row-toggle{margin:0}
+.desc p{white-space:pre-line}
+input,textarea,button{font:inherit;color:inherit}
+button{display:inline-block;min-height:2rem;padding:.25rem .75rem;border:1px solid var(--fg);border-radius:0;background:var(--bg);color:var(--fg);cursor:pointer}
+button[aria-pressed="true"]{background:var(--fg);color:var(--bg);font-weight:bold}
+form.inline{display:inline}.linklike{border:0;padding:0;min-height:0;background:none;color:var(--link);text-decoration:underline;text-underline-offset:.18em;font:inherit;cursor:pointer}.theme{display:inline}.row-toggle button,.interest button{white-space:nowrap}.interest button{margin:0 .5rem .5rem 0}
+/* Kiosk */
+h1{font-size:1.75rem;letter-spacing:-.02em;line-height:1.2}header h1,header .brand{font-size:1.375rem;letter-spacing:-.03em}
+h2{font-size:.9375rem;text-transform:uppercase;letter-spacing:.08em}.events time{font-weight:bold}
+a{text-underline-offset:.18em;text-decoration-color:color-mix(in srgb,var(--link) 55%,transparent)}
+button{border-radius:4px;padding:.3rem .85rem}
+button[aria-pressed="true"]{background:var(--link);border-color:var(--link);color:var(--bg)}
+
+/* ===== PROPOSED motion block (proposal.md §7.1) ===== */
+:root { --ease: cubic-bezier(.2, 0, 0, 1); --t-out: 120ms; --t: 150ms; --t-page: 200ms; }
+button:not(.linklike) {
+  transition: background-color var(--t) var(--ease), border-color var(--t) var(--ease),
+              color var(--t) var(--ease), transform var(--t-out) var(--ease);
+}
+button:not(.linklike):active { transform: scale(.97); transition-duration: 0s; }
+button[aria-pressed]::before {
+  content: ""; display: inline-block; width: 1.15em; opacity: 0;
+  transition: opacity var(--t) var(--ease);
+}
+button[aria-pressed="true"]::before { content: "✓" / ""; opacity: 1; }
+button[aria-pressed="true"] { font-weight: inherit; }
+@media (hover: hover) {
+  a, .linklike { transition: text-decoration-color var(--t) var(--ease); }
+  a:hover, .linklike:hover { text-decoration-color: var(--link); transition-duration: 0s; }
+}
+@keyframes fade-in { from { opacity: 0; } }
+form[data-swapped] .count, form[data-swapped] small { animation: fade-in var(--t) var(--ease); }
+@view-transition { navigation: auto; }
+::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2, 0, 0, 1); }
+header { view-transition-name: header; }
+.filters { view-transition-name: filters; }
+.events li > div > a:first-child { display: inline-block; }
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { transition: none !important; animation: none !important; }
+  button:active { transform: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+/* ===== preview only: checkbox mirror of the reduced-motion block ===== */
+html.reduce *, html.reduce ::before, html.reduce ::after { transition: none !important; animation: none !important; }
+html.reduce button:active { transform: none; }
+.demo-note { border: 1px dashed var(--rule); padding: .5rem .75rem; margin: 1rem 0; font-size: .9375rem; color: var(--muted); }
+.demo-note label { display: inline; }
+
+</style>
+</head>
+<body>
+<header>
+  <p class="brand"><a href="preview.html">dside events</a></p>
+  <nav aria-label="Account"><a href="#">account</a>
+    <form method="post" action="/theme" class="inline theme" onsubmit="return false"><input type="hidden" name="back" value="/">
+      · <button name="theme" value="dark" class="linklike">dark</button></form></nav>
+</header>
+<main>
+<div class="demo-note">Event page. Header stayed still (shared <code>view-transition-name: header</code>); the title travelled from the row (<code>e-dogville-2026-09-06</code>). Press the browser Back button to see it return.</div>
+
+<h1 style="view-transition-name: e-dogville-2026-09-06">Dogville</h1>
+<p>
+  <time datetime="2026-09-06T19:00:00+03:00">Today · Sunday 6 September, 19:00</time><br>
+  Cine Paris<br>
+  <a href="preview.html">film</a>
+  <br>€7
+</p>
+
+<form method="post" action="/e/dogville-2026-09-06/interest" data-toggle class="interest">
+  <input type="hidden" name="back" value="/e/dogville-2026-09-06">
+  <button name="state" value="interested" aria-pressed="false">Interested</button>
+  <button name="state" value="not_interested" aria-pressed="false">Not interested</button>
+  <span class="count">1 interested</span>
+</form>
+
+<div class="desc"><p>Ανοιχτό σινεμά στην Πλάκα. Lars von Trier, 2003, με αγγλικούς υπότιτλους.</p></div>
+<hr>
+<p>Posted by <a href="#">Nikos K.</a></p>
+<p><a href="preview.html">← Back to the list</a></p>
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+<script>
+(function () {
+  'use strict';
+  document.addEventListener('submit', function (e) {
+    var form = e.target, btn = e.submitter;
+    if (!form.matches('form[data-toggle]') || !btn) return;
+    e.preventDefault();
+    if (form.dataset.busy) return;
+    form.dataset.busy = '1';
+    var wasPressed = btn.getAttribute('aria-pressed') === 'true';
+    form.querySelectorAll('[aria-pressed]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b === btn && !wasPressed ? 'true' : 'false');
+    });
+    setTimeout(function () {
+      var fresh = form.cloneNode(true); delete fresh.dataset.busy;
+      var count = fresh.querySelector('.count'), n = parseInt(count.textContent, 10) || 0;
+      if (btn.value === 'interested') n = wasPressed ? Math.max(0, n - 1) : n + 1;
+      count.textContent = n ? n + ' interested' : 'Nobody yet interested';
+      fresh.dataset.swapped = '1';
+      form.replaceWith(fresh);
+    }, 350);
+  });
+})();
+</script>
+</body>
+</html>

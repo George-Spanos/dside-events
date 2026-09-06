@@ -1,0 +1,19 @@
+/* Direction 1 — Paper and ink. Lines that differ from static/style.css. */
+:root {
+  --bg: #F3ECDF; --fg: #2B2119; --muted: #6A594B; --link: #8E2F1A; --error: #B8141F; --rule: #D8CDBB;
+  --serif: "Palatino Linotype", Palatino, "Book Antiqua", P052, Georgia, "Noto Serif", "DejaVu Serif", serif;
+  font: 106.25%/1.55 var(--serif);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1F1915; --fg: #EFE5D6; --muted: #B6A794; --link: #F0A283; --error: #FF8F86; --rule: #3F352D; }
+}
+h1 { font-size: 1.75rem; font-weight: normal; line-height: 1.2; }
+header h1, header .brand { font-size: 1.375rem; font-weight: bold; letter-spacing: -.02em; }
+h2 { font-size: 1.0625rem; font-weight: normal; font-style: italic; letter-spacing: .01em; }
+.day { font-style: italic; }
+.day b { font-style: normal; }
+.events time { font-variant-numeric: lining-nums tabular-nums; }
+a { text-decoration-thickness: 1px; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+button { border-color: var(--muted); padding: .3rem .8rem; }
+button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
+footer small { font-style: italic; }

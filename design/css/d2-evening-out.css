@@ -1,0 +1,19 @@
+/* Direction 2 — Evening out. Lines that differ from static/style.css. */
+:root {
+  --bg: #EEE7DA; --fg: #231B29; --muted: #655A6D; --link: #6E2A5F; --error: #AE1A31; --rule: #D5CBBB;
+  --sans: "Lucida Grande", "Segoe UI", Roboto, "Noto Sans", "Lucida Sans Unicode", sans-serif;
+  font: 100%/1.55 var(--sans);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1B1727; --fg: #ECE3E7; --muted: #B3A7BA; --link: #F0B24F; --error: #FF9494; --rule: #3A324B; }
+}
+h1 { font-size: 1.625rem; font-weight: bold; letter-spacing: -.015em; line-height: 1.2; }
+header h1, header .brand { font-size: 1.25rem; letter-spacing: -.02em; }
+h2 { letter-spacing: .01em; }
+.day { color: var(--muted); }
+.day b { color: var(--fg); }
+.events time { font-variant-numeric: tabular-nums; }
+.meta { line-height: 1.45; }
+a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+button { border-color: var(--muted); padding: .3rem .8rem; }
+button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }

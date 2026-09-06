@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dside events — three warm directions (preview)</title>
+<style>
+html { background: #d8d4cc; font: 14px/1.4 system-ui, sans-serif; color: #222; }
+body { margin: 0; }
+.pv-intro { max-width: 68ch; margin: 0 auto; padding: 1.5rem 1rem; }
+.pv-intro code { background: #ece8e0; padding: 0 .25em; }
+section[class^="dir-"] { background: var(--bg); color: var(--fg); padding-bottom: 3rem; }
+.pv-bar { background: #333; color: #eee; padding: .75rem 1rem; font: 14px/1.4 system-ui, sans-serif; display: flex; flex-wrap: wrap; gap: .25rem 1rem; align-items: baseline; position: sticky; top: 0; z-index: 1; }
+section[class^="dir-"] .pv-bar h2 { margin: 0; padding: 0; border: 0; font: bold 15px/1.4 system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: #fff; }
+section[class^="dir-"] .pv-bar p { margin: 0; flex: 1 1 100%; color: #ccc; }
+section[class^="dir-"] .pv-bar small { color: #bbb; font: 13px/1.4 system-ui, sans-serif; flex: 1 1 100%; }
+section[class^="dir-"] .pv-bar button { font: inherit; border: 1px solid #999; background: #444; color: #fff; padding: .2rem .6rem; cursor: pointer; border-radius: 0; }
+.pv-label { color: inherit; text-align: center; font: 12px/1.4 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .1em; opacity: .55; margin: 2.5rem 0 -.5rem; }
+
+/* ===== Direction 1: Paper and ink — base stylesheet, scoped ===== */
+.dir-1.dark {--bg: #111;
+    --fg: #e6e6e6;
+    --muted: #a0a0a0;
+    --link: #8ab4f8;
+    --error: #ff8080;
+    --rule: #3a3a3a;}
+.dir-1 { --measure: 68ch; }
+.dir-1 * { box-sizing: border-box; }
+.dir-1 .page { margin: 0 auto;
+  padding: 0 17px 34px;
+  max-width: var(--measure);
+  background: var(--bg);
+  color: var(--fg);
+  overflow-wrap: anywhere; }
+.dir-1 h1, .dir-1 h2, .dir-1 p, .dir-1 ul, .dir-1 form, .dir-1 fieldset, .dir-1 hr, .dir-1 div.desc { margin: 0 0 17px; }
+.dir-1 h1 { font-size: 25.5px; line-height: 1.25; }
+.dir-1 h2 { font-size: 17px;
+  margin-top: 25.5px;
+  padding-bottom: 4.25px;
+  border-bottom: 1px solid var(--rule); }
+.dir-1 h3 { font-size: 17px; margin: 25.5px 0 8.5px; }
+.dir-1 .page.wide { max-width: 110ch; }
+.dir-1 a { color: var(--link); text-decoration: underline; text-underline-offset: .15em; }
+.dir-1 [aria-current] { font-weight: bold; text-decoration: none; }
+.dir-1 [aria-current] a { color: inherit; text-decoration: none; }
+.dir-1 hr { border: 0; border-top: 1px solid var(--rule); }
+.dir-1 small, .dir-1 .muted, .dir-1 .hint, .dir-1 .count { color: var(--muted); }
+.dir-1 small, .dir-1 .hint { font-size: 15.9375px; }
+.dir-1 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.dir-1 header { display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4.25px 17px;
+  padding: 17px 0;
+  margin-bottom: 17px;
+  border-bottom: 1px solid var(--rule); }
+.dir-1 header h1, .dir-1 header .brand { font-size: 21.25px; font-weight: bold; margin: 0; }
+.dir-1 header nav, .dir-1 .filters { line-height: 1.75; }
+.dir-1 .filters { margin-bottom: 17px; }
+.dir-1 footer { margin-top: 51px; }
+.dir-1 .events, .dir-1 .links, .dir-1 .past, .dir-1 .curators { list-style: none; padding: 0; }
+.dir-1 .past li, .dir-1 .curators li { margin-bottom: 8.5px; }
+.dir-1 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(408px, 100%), 1fr)); gap: 0 51px; }
+.dir-1 .day { font-size: 17px;
+  font-weight: normal;
+  margin: 34px 0 8.5px;
+  padding-bottom: 4.25px;
+  border-bottom: 1px solid var(--rule); }
+.dir-1 .day b { font-weight: bold; }
+.dir-1 h2 + .day { margin-top: 17px; }
+.dir-1 .events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 17px; }
+.dir-1 .meta span { display: block; }
+.dir-1 .events time { font-variant-numeric: tabular-nums; }
+.dir-1 .row-toggle { margin: 0; }
+.dir-1 .desc p { white-space: pre-line; }
+.dir-1 label { display: block; margin-bottom: 4.25px; }
+.dir-1 input, .dir-1 textarea, .dir-1 button { font: inherit; color: inherit; }
+.dir-1 input:not([type="checkbox"]):not([type="hidden"]), .dir-1 textarea { display: block;
+  width: 100%;
+  padding: 6.375px 8.5px;
+  margin-bottom: 17px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  background: var(--bg); }
+.dir-1 textarea { min-height: 170px; }
+.dir-1 fieldset { border: 0; padding: 0; min-width: 0; }
+.dir-1 legend { padding: 0; margin-bottom: 4.25px; }
+.dir-1 .check { display: inline-block; margin: 0 17px 8.5px 0; }
+.dir-1 .check input { width: 19.125px; height: 19.125px; margin: 0 6.375px 0 0; vertical-align: -.15em; }
+.dir-1 .hint { margin: -12.75px 0 17px; }
+.dir-1 .row { display: flex; flex-wrap: wrap; gap: 0 17px; }
+.dir-1 .row > div { flex: 1 1 136px; }
+.dir-1 button { display: inline-block;
+  min-height: 34px;
+  padding: 4.25px 12.75px;
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer; }
+.dir-1 button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: bold; }
+.dir-1 form.inline { display: inline; }
+.dir-1 .row-toggle button, .dir-1 .interest button { white-space: nowrap; }
+.dir-1 .interest button { margin: 0 8.5px 8.5px 0; }
+.dir-1 .tagfollows { margin-bottom: 17px; }
+.dir-1 .tagfollows button { margin: 0 8.5px 8.5px 0; }
+.dir-1 .error, .dir-1 .errors { color: var(--error); }
+.dir-1 .error { margin: 0 0 17px; font-size: 15.9375px; }
+.dir-1 input + .error, .dir-1 textarea + .error, .dir-1 .hint + .error { margin-top: -12.75px; }
+.dir-1 .errors ul { margin-bottom: 0; }
+.dir-1 .errors a { color: inherit; }
+.dir-1 [aria-invalid="true"] { border-color: var(--error); }
+/* ===== Direction 1: Paper and ink — the lines that differ ===== */
+.dir-1.dark {--bg: #1F1915; --fg: #EFE5D6; --muted: #B6A794; --link: #F0A283; --error: #FF8F86; --rule: #3F352D;}
+.dir-1 { --bg: #F3ECDF; --fg: #2B2119; --muted: #6A594B; --link: #8E2F1A; --error: #B8141F; --rule: #D8CDBB;
+  --serif: "Palatino Linotype", Palatino, "Book Antiqua", P052, Georgia, "Noto Serif", "DejaVu Serif", serif;
+  font: 17px/1.55 var(--serif); }
+.dir-1 h1 { font-size: 29.75px; font-weight: normal; line-height: 1.2; }
+.dir-1 header h1, .dir-1 header .brand { font-size: 23.375px; font-weight: bold; letter-spacing: -.02em; }
+.dir-1 h2 { font-size: 18.0625px; font-weight: normal; font-style: italic; letter-spacing: .01em; }
+.dir-1 .day { font-style: italic; }
+.dir-1 .day b { font-style: normal; }
+.dir-1 .events time { font-variant-numeric: lining-nums tabular-nums; }
+.dir-1 a { text-decoration-thickness: 1px; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+.dir-1 button { border-color: var(--muted); padding: 5.1px 13.6px; }
+.dir-1 button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
+.dir-1 footer small { font-style: italic; }
+/* ===== Direction 2: Evening out — base stylesheet, scoped ===== */
+.dir-2.dark {--bg: #111;
+    --fg: #e6e6e6;
+    --muted: #a0a0a0;
+    --link: #8ab4f8;
+    --error: #ff8080;
+    --rule: #3a3a3a;}
+.dir-2 { --measure: 68ch; }
+.dir-2 * { box-sizing: border-box; }
+.dir-2 .page { margin: 0 auto;
+  padding: 0 16px 32px;
+  max-width: var(--measure);
+  background: var(--bg);
+  color: var(--fg);
+  overflow-wrap: anywhere; }
+.dir-2 h1, .dir-2 h2, .dir-2 p, .dir-2 ul, .dir-2 form, .dir-2 fieldset, .dir-2 hr, .dir-2 div.desc { margin: 0 0 16px; }
+.dir-2 h1 { font-size: 24px; line-height: 1.25; }
+.dir-2 h2 { font-size: 16px;
+  margin-top: 24px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule); }
+.dir-2 h3 { font-size: 16px; margin: 24px 0 8px; }
+.dir-2 .page.wide { max-width: 110ch; }
+.dir-2 a { color: var(--link); text-decoration: underline; text-underline-offset: .15em; }
+.dir-2 [aria-current] { font-weight: bold; text-decoration: none; }
+.dir-2 [aria-current] a { color: inherit; text-decoration: none; }
+.dir-2 hr { border: 0; border-top: 1px solid var(--rule); }
+.dir-2 small, .dir-2 .muted, .dir-2 .hint, .dir-2 .count { color: var(--muted); }
+.dir-2 small, .dir-2 .hint { font-size: 15px; }
+.dir-2 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.dir-2 header { display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule); }
+.dir-2 header h1, .dir-2 header .brand { font-size: 20px; font-weight: bold; margin: 0; }
+.dir-2 header nav, .dir-2 .filters { line-height: 1.75; }
+.dir-2 .filters { margin-bottom: 16px; }
+.dir-2 footer { margin-top: 48px; }
+.dir-2 .events, .dir-2 .links, .dir-2 .past, .dir-2 .curators { list-style: none; padding: 0; }
+.dir-2 .past li, .dir-2 .curators li { margin-bottom: 8px; }
+.dir-2 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(384px, 100%), 1fr)); gap: 0 48px; }
+.dir-2 .day { font-size: 16px;
+  font-weight: normal;
+  margin: 32px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule); }
+.dir-2 .day b { font-weight: bold; }
+.dir-2 h2 + .day { margin-top: 16px; }
+.dir-2 .events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 16px; }
+.dir-2 .meta span { display: block; }
+.dir-2 .events time { font-variant-numeric: tabular-nums; }
+.dir-2 .row-toggle { margin: 0; }
+.dir-2 .desc p { white-space: pre-line; }
+.dir-2 label { display: block; margin-bottom: 4px; }
+.dir-2 input, .dir-2 textarea, .dir-2 button { font: inherit; color: inherit; }
+.dir-2 input:not([type="checkbox"]):not([type="hidden"]), .dir-2 textarea { display: block;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  background: var(--bg); }
+.dir-2 textarea { min-height: 160px; }
+.dir-2 fieldset { border: 0; padding: 0; min-width: 0; }
+.dir-2 legend { padding: 0; margin-bottom: 4px; }
+.dir-2 .check { display: inline-block; margin: 0 16px 8px 0; }
+.dir-2 .check input { width: 18px; height: 18px; margin: 0 6px 0 0; vertical-align: -.15em; }
+.dir-2 .hint { margin: -12px 0 16px; }
+.dir-2 .row { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.dir-2 .row > div { flex: 1 1 128px; }
+.dir-2 button { display: inline-block;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer; }
+.dir-2 button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: bold; }
+.dir-2 form.inline { display: inline; }
+.dir-2 .row-toggle button, .dir-2 .interest button { white-space: nowrap; }
+.dir-2 .interest button { margin: 0 8px 8px 0; }
+.dir-2 .tagfollows { margin-bottom: 16px; }
+.dir-2 .tagfollows button { margin: 0 8px 8px 0; }
+.dir-2 .error, .dir-2 .errors { color: var(--error); }
+.dir-2 .error { margin: 0 0 16px; font-size: 15px; }
+.dir-2 input + .error, .dir-2 textarea + .error, .dir-2 .hint + .error { margin-top: -12px; }
+.dir-2 .errors ul { margin-bottom: 0; }
+.dir-2 .errors a { color: inherit; }
+.dir-2 [aria-invalid="true"] { border-color: var(--error); }
+/* ===== Direction 2: Evening out — the lines that differ ===== */
+.dir-2.dark {--bg: #1B1727; --fg: #ECE3E7; --muted: #B3A7BA; --link: #F0B24F; --error: #FF9494; --rule: #3A324B;}
+.dir-2 { --bg: #EEE7DA; --fg: #231B29; --muted: #655A6D; --link: #6E2A5F; --error: #AE1A31; --rule: #D5CBBB;
+  --sans: "Lucida Grande", "Segoe UI", Roboto, "Noto Sans", "Lucida Sans Unicode", sans-serif;
+  font: 16px/1.55 var(--sans); }
+.dir-2 h1 { font-size: 26px; font-weight: bold; letter-spacing: -.015em; line-height: 1.2; }
+.dir-2 header h1, .dir-2 header .brand { font-size: 20px; letter-spacing: -.02em; }
+.dir-2 h2 { letter-spacing: .01em; }
+.dir-2 .day { color: var(--muted); }
+.dir-2 .day b { color: var(--fg); }
+.dir-2 .events time { font-variant-numeric: tabular-nums; }
+.dir-2 .meta { line-height: 1.45; }
+.dir-2 a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+.dir-2 button { border-color: var(--muted); padding: 4.8px 12.8px; }
+.dir-2 button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
+/* ===== Direction 3: Kiosk — base stylesheet, scoped ===== */
+.dir-3.dark {--bg: #111;
+    --fg: #e6e6e6;
+    --muted: #a0a0a0;
+    --link: #8ab4f8;
+    --error: #ff8080;
+    --rule: #3a3a3a;}
+.dir-3 { --measure: 68ch; }
+.dir-3 * { box-sizing: border-box; }
+.dir-3 .page { margin: 0 auto;
+  padding: 0 17px 34px;
+  max-width: var(--measure);
+  background: var(--bg);
+  color: var(--fg);
+  overflow-wrap: anywhere; }
+.dir-3 h1, .dir-3 h2, .dir-3 p, .dir-3 ul, .dir-3 form, .dir-3 fieldset, .dir-3 hr, .dir-3 div.desc { margin: 0 0 17px; }
+.dir-3 h1 { font-size: 25.5px; line-height: 1.25; }
+.dir-3 h2 { font-size: 17px;
+  margin-top: 25.5px;
+  padding-bottom: 4.25px;
+  border-bottom: 1px solid var(--rule); }
+.dir-3 h3 { font-size: 17px; margin: 25.5px 0 8.5px; }
+.dir-3 .page.wide { max-width: 110ch; }
+.dir-3 a { color: var(--link); text-decoration: underline; text-underline-offset: .15em; }
+.dir-3 [aria-current] { font-weight: bold; text-decoration: none; }
+.dir-3 [aria-current] a { color: inherit; text-decoration: none; }
+.dir-3 hr { border: 0; border-top: 1px solid var(--rule); }
+.dir-3 small, .dir-3 .muted, .dir-3 .hint, .dir-3 .count { color: var(--muted); }
+.dir-3 small, .dir-3 .hint { font-size: 15.9375px; }
+.dir-3 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.dir-3 header { display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4.25px 17px;
+  padding: 17px 0;
+  margin-bottom: 17px;
+  border-bottom: 1px solid var(--rule); }
+.dir-3 header h1, .dir-3 header .brand { font-size: 21.25px; font-weight: bold; margin: 0; }
+.dir-3 header nav, .dir-3 .filters { line-height: 1.75; }
+.dir-3 .filters { margin-bottom: 17px; }
+.dir-3 footer { margin-top: 51px; }
+.dir-3 .events, .dir-3 .links, .dir-3 .past, .dir-3 .curators { list-style: none; padding: 0; }
+.dir-3 .past li, .dir-3 .curators li { margin-bottom: 8.5px; }
+.dir-3 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(408px, 100%), 1fr)); gap: 0 51px; }
+.dir-3 .day { font-size: 17px;
+  font-weight: normal;
+  margin: 34px 0 8.5px;
+  padding-bottom: 4.25px;
+  border-bottom: 1px solid var(--rule); }
+.dir-3 .day b { font-weight: bold; }
+.dir-3 h2 + .day { margin-top: 17px; }
+.dir-3 .events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 17px; }
+.dir-3 .meta span { display: block; }
+.dir-3 .events time { font-variant-numeric: tabular-nums; }
+.dir-3 .row-toggle { margin: 0; }
+.dir-3 .desc p { white-space: pre-line; }
+.dir-3 label { display: block; margin-bottom: 4.25px; }
+.dir-3 input, .dir-3 textarea, .dir-3 button { font: inherit; color: inherit; }
+.dir-3 input:not([type="checkbox"]):not([type="hidden"]), .dir-3 textarea { display: block;
+  width: 100%;
+  padding: 6.375px 8.5px;
+  margin-bottom: 17px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  background: var(--bg); }
+.dir-3 textarea { min-height: 170px; }
+.dir-3 fieldset { border: 0; padding: 0; min-width: 0; }
+.dir-3 legend { padding: 0; margin-bottom: 4.25px; }
+.dir-3 .check { display: inline-block; margin: 0 17px 8.5px 0; }
+.dir-3 .check input { width: 19.125px; height: 19.125px; margin: 0 6.375px 0 0; vertical-align: -.15em; }
+.dir-3 .hint { margin: -12.75px 0 17px; }
+.dir-3 .row { display: flex; flex-wrap: wrap; gap: 0 17px; }
+.dir-3 .row > div { flex: 1 1 136px; }
+.dir-3 button { display: inline-block;
+  min-height: 34px;
+  padding: 4.25px 12.75px;
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer; }
+.dir-3 button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: bold; }
+.dir-3 form.inline { display: inline; }
+.dir-3 .row-toggle button, .dir-3 .interest button { white-space: nowrap; }
+.dir-3 .interest button { margin: 0 8.5px 8.5px 0; }
+.dir-3 .tagfollows { margin-bottom: 17px; }
+.dir-3 .tagfollows button { margin: 0 8.5px 8.5px 0; }
+.dir-3 .error, .dir-3 .errors { color: var(--error); }
+.dir-3 .error { margin: 0 0 17px; font-size: 15.9375px; }
+.dir-3 input + .error, .dir-3 textarea + .error, .dir-3 .hint + .error { margin-top: -12.75px; }
+.dir-3 .errors ul { margin-bottom: 0; }
+.dir-3 .errors a { color: inherit; }
+.dir-3 [aria-invalid="true"] { border-color: var(--error); }
+/* ===== Direction 3: Kiosk — the lines that differ ===== */
+.dir-3.dark {--bg: #272320; --fg: #F1EADF; --muted: #B8AC9D; --link: #E9B653; --error: #FF9585; --rule: #4B433B;}
+.dir-3 { --bg: #FCF8EF; --fg: #2E2823; --muted: #6C6157; --link: #875800; --error: #B5261A; --rule: #E2D9C9;
+  --sans: ui-rounded, "Trebuchet MS", Ubuntu, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  font: 17px/1.5 var(--sans); }
+.dir-3 h1 { font-size: 29.75px; letter-spacing: -.02em; line-height: 1.2; }
+.dir-3 header h1, .dir-3 header .brand { font-size: 23.375px; letter-spacing: -.03em; }
+.dir-3 h2 { font-size: 15.9375px; text-transform: uppercase; letter-spacing: .08em; }
+.dir-3 .events time { font-variant-numeric: tabular-nums; font-weight: bold; }
+.dir-3 a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+.dir-3 button { border-radius: 4px; padding: 5.1px 14.45px; }
+.dir-3 button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }</style>
+</head>
+<body><div class="pv-intro"><strong>dside events — three warm directions.</strong> Real home page HTML and event page HTML, each rendered three times under a different token set.
+Every direction defaults to light; use its toggle for the dark palette. Links go nowhere; the Interested buttons toggle locally so you can judge the pressed look. Self-contained file, no network.</div>
+<section class="dir-1 light" id="dir-1">
+<div class="pv-bar"><h2>Direction 1 — Paper and ink</h2><button class="pv-toggle" type="button">Switch to dark</button><p>Warm uncoated paper, espresso ink, stamp-red links; one old-style serif for everything, like the folded programme you pick up at the door of an open-air cinema.</p><small>Rendering with the system stack (Palatino Linotype / Palatino / P052 / Georgia / Noto Serif). Optional self-hosted face Alegreya (OFL) is NOT loaded here.</small></div>
+<div class="pv-label">home /</div>
+<div class="page wide">
+<header>
+  <h1>dside events</h1>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+
+<nav class="filters" aria-label="Filter events">
+  <strong aria-current="page"><a href="#">all</a></strong> · <a href="#">following</a> · <a href="#">concert</a> · <a href="#">theater</a> · <a href="#">film</a> · <a href="#">exhibition</a>
+</nav>
+
+
+<div class="columns">
+<section class="upcoming">
+<h2>Upcoming</h2>
+
+
+<h3 class="day"><b>Today · Sunday</b> 6 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-06T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Dogville</a>
+      <small class="meta">
+        <span><a href="#">film</a></span>
+        <span>Cine Paris, €7</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-06T21:30:00&#43;03:00">21:30</time>
+    <div>
+      <a href="#">Ταξίδι στη Χώρα των Ήχων</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Gagarin 205, €12</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tomorrow · Monday</b> 7 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-07T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Autumn opening night</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Romantso, €10</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-07T21:00:00&#43;03:00">21:00</time>
+    <div>
+      <a href="#">Ο Γλάρος</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Θέατρο Τέχνης Φρυνίχου, €15 / €10 μειωμένο</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tuesday</b> 8 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-08T18:30:00&#43;03:00">18:30</time>
+    <div>
+      <a href="#">Σκίτσο στη Δημοτική Αγορά</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Δημοτική Αγορά Κυψέλης, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Wednesday</b> 9 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-09T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Πόλη και μνήμη</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ίδρυμα Λασκαρίδη, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-09T20:30:00&#43;03:00">20:30</time>
+    <div>
+      <a href="#">Late set: Nikos K. Quartet</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>six d.o.g.s, €8</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Friday</b> 11 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-11T12:00:00&#43;03:00">12:00</time>
+    <div>
+      <a href="#">Χαρτί &amp; Φως</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ζωγράφου, στούντιο 3, Free</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Saturday</b> 12 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-12T22:00:00&#43;03:00">22:00</time>
+    <div>
+      <a href="#">Bass Sunday</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Death Disco, €5</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Monday</b> 14 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-14T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Duets</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Ωδείο Αθηνών, €12</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+
+<p><a href="#">All upcoming events →</a></p>
+</section>
+</div>
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+<div class="pv-label">event /e/dogville-2026-09-06</div>
+<div class="page">
+<header>
+  <p class="brand"><a href="#">dside events</a></p>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+<h1>Dogville</h1>
+<p>
+  <time datetime="2026-09-06T19:00:00&#43;03:00">Today · Sunday 6 September, 19:00</time><br>
+  Cine Paris<br>
+  <a href="#">film</a>
+  <br>€7
+</p>
+
+
+
+<form onsubmit="return false" method="post" data-toggle class="interest">
+  <input type="hidden" name="back" value="/e/dogville-2026-09-06">
+  <button name="state" value="interested" aria-pressed="false">Interested</button>
+  <button name="state" value="not_interested" aria-pressed="false">Not interested</button>
+  <span class="count">1 interested</span>
+  
+</form>
+
+
+
+<div class="desc"><p>Ανοιχτό σινεμά στην Πλάκα. Lars von Trier, 2003, με αγγλικούς υπότιτλους.</p></div>
+<hr>
+<p>Posted by <a href="#">Nikos K.</a></p>
+
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+</section>
+<section class="dir-2 light" id="dir-2">
+<div class="pv-bar"><h2>Direction 2 — Evening out</h2><button class="pv-toggle" type="button">Switch to dark</button><p>Sand and plum by day; at night the sky over Athens is aubergine and the street lights are amber, not black and blue. Humanist sans (Lucida Grande / Segoe UI).</p><small>Rendering with the system stack (Lucida Grande / Segoe UI / Roboto / Noto Sans). No self-hosted font needed.</small></div>
+<div class="pv-label">home /</div>
+<div class="page wide">
+<header>
+  <h1>dside events</h1>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+
+<nav class="filters" aria-label="Filter events">
+  <strong aria-current="page"><a href="#">all</a></strong> · <a href="#">following</a> · <a href="#">concert</a> · <a href="#">theater</a> · <a href="#">film</a> · <a href="#">exhibition</a>
+</nav>
+
+
+<div class="columns">
+<section class="upcoming">
+<h2>Upcoming</h2>
+
+
+<h3 class="day"><b>Today · Sunday</b> 6 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-06T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Dogville</a>
+      <small class="meta">
+        <span><a href="#">film</a></span>
+        <span>Cine Paris, €7</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-06T21:30:00&#43;03:00">21:30</time>
+    <div>
+      <a href="#">Ταξίδι στη Χώρα των Ήχων</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Gagarin 205, €12</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tomorrow · Monday</b> 7 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-07T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Autumn opening night</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Romantso, €10</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-07T21:00:00&#43;03:00">21:00</time>
+    <div>
+      <a href="#">Ο Γλάρος</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Θέατρο Τέχνης Φρυνίχου, €15 / €10 μειωμένο</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tuesday</b> 8 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-08T18:30:00&#43;03:00">18:30</time>
+    <div>
+      <a href="#">Σκίτσο στη Δημοτική Αγορά</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Δημοτική Αγορά Κυψέλης, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Wednesday</b> 9 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-09T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Πόλη και μνήμη</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ίδρυμα Λασκαρίδη, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-09T20:30:00&#43;03:00">20:30</time>
+    <div>
+      <a href="#">Late set: Nikos K. Quartet</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>six d.o.g.s, €8</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Friday</b> 11 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-11T12:00:00&#43;03:00">12:00</time>
+    <div>
+      <a href="#">Χαρτί &amp; Φως</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ζωγράφου, στούντιο 3, Free</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Saturday</b> 12 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-12T22:00:00&#43;03:00">22:00</time>
+    <div>
+      <a href="#">Bass Sunday</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Death Disco, €5</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Monday</b> 14 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-14T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Duets</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Ωδείο Αθηνών, €12</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+
+<p><a href="#">All upcoming events →</a></p>
+</section>
+</div>
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+<div class="pv-label">event /e/dogville-2026-09-06</div>
+<div class="page">
+<header>
+  <p class="brand"><a href="#">dside events</a></p>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+<h1>Dogville</h1>
+<p>
+  <time datetime="2026-09-06T19:00:00&#43;03:00">Today · Sunday 6 September, 19:00</time><br>
+  Cine Paris<br>
+  <a href="#">film</a>
+  <br>€7
+</p>
+
+
+
+<form onsubmit="return false" method="post" data-toggle class="interest">
+  <input type="hidden" name="back" value="/e/dogville-2026-09-06">
+  <button name="state" value="interested" aria-pressed="false">Interested</button>
+  <button name="state" value="not_interested" aria-pressed="false">Not interested</button>
+  <span class="count">1 interested</span>
+  
+</form>
+
+
+
+<div class="desc"><p>Ανοιχτό σινεμά στην Πλάκα. Lars von Trier, 2003, με αγγλικούς υπότιτλους.</p></div>
+<hr>
+<p>Posted by <a href="#">Nikos K.</a></p>
+
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+</section>
+<section class="dir-3 light" id="dir-3">
+<div class="pv-bar"><h2>Direction 3 — Kiosk</h2><button class="pv-toggle" type="button">Switch to dark</button><p>The periptero: warm white, warm-grey ink, ochre-mustard links, rounded friendly sans, no serif anywhere. Dark mode is warm charcoal.</p><small>Rendering with the system stack (ui-rounded / Trebuchet MS / Ubuntu / Segoe UI). Optional self-hosted face Ubuntu (UFL 1.0) is only loaded if your OS has it.</small></div>
+<div class="pv-label">home /</div>
+<div class="page wide">
+<header>
+  <h1>dside events</h1>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+
+<nav class="filters" aria-label="Filter events">
+  <strong aria-current="page"><a href="#">all</a></strong> · <a href="#">following</a> · <a href="#">concert</a> · <a href="#">theater</a> · <a href="#">film</a> · <a href="#">exhibition</a>
+</nav>
+
+
+<div class="columns">
+<section class="upcoming">
+<h2>Upcoming</h2>
+
+
+<h3 class="day"><b>Today · Sunday</b> 6 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-06T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Dogville</a>
+      <small class="meta">
+        <span><a href="#">film</a></span>
+        <span>Cine Paris, €7</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-06T21:30:00&#43;03:00">21:30</time>
+    <div>
+      <a href="#">Ταξίδι στη Χώρα των Ήχων</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Gagarin 205, €12</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tomorrow · Monday</b> 7 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-07T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Autumn opening night</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Romantso, €10</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-07T21:00:00&#43;03:00">21:00</time>
+    <div>
+      <a href="#">Ο Γλάρος</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Θέατρο Τέχνης Φρυνίχου, €15 / €10 μειωμένο</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Tuesday</b> 8 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-08T18:30:00&#43;03:00">18:30</time>
+    <div>
+      <a href="#">Σκίτσο στη Δημοτική Αγορά</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Δημοτική Αγορά Κυψέλης, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Wednesday</b> 9 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-09T19:00:00&#43;03:00">19:00</time>
+    <div>
+      <a href="#">Πόλη και μνήμη</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ίδρυμα Λασκαρίδη, Free</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+  <li>
+    <time datetime="2026-09-09T20:30:00&#43;03:00">20:30</time>
+    <div>
+      <a href="#">Late set: Nikos K. Quartet</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>six d.o.g.s, €8</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Friday</b> 11 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-11T12:00:00&#43;03:00">12:00</time>
+    <div>
+      <a href="#">Χαρτί &amp; Φως</a>
+      <small class="meta">
+        <span><a href="#">exhibition</a></span>
+        <span>Ζωγράφου, στούντιο 3, Free</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Saturday</b> 12 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-12T22:00:00&#43;03:00">22:00</time>
+    <div>
+      <a href="#">Bass Sunday</a>
+      <small class="meta">
+        <span><a href="#">concert</a></span>
+        <span>Death Disco, €5</span>
+        <span><a href="#">Maria P.</a></span>
+        <span>2 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+<h3 class="day"><b>Monday</b> 14 September</h3>
+<ul class="events">
+  
+  <li>
+    <time datetime="2026-09-14T20:00:00&#43;03:00">20:00</time>
+    <div>
+      <a href="#">Duets</a>
+      <small class="meta">
+        <span><a href="#">theater</a></span>
+        <span>Ωδείο Αθηνών, €12</span>
+        <span><a href="#">Nikos K.</a></span>
+        <span>1 interested</span>
+      </small>
+    </div>
+    <form onsubmit="return false" method="post" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="/">
+      <button name="state" value="interested" aria-pressed="false">Interested</button>
+    </form>
+  </li>
+  
+</ul>
+
+
+<p><a href="#">All upcoming events →</a></p>
+</section>
+</div>
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+<div class="pv-label">event /e/dogville-2026-09-06</div>
+<div class="page">
+<header>
+  <p class="brand"><a href="#">dside events</a></p>
+  <nav aria-label="Account">
+    <a href="#">account</a>
+    
+  </nav>
+</header>
+<main>
+
+<h1>Dogville</h1>
+<p>
+  <time datetime="2026-09-06T19:00:00&#43;03:00">Today · Sunday 6 September, 19:00</time><br>
+  Cine Paris<br>
+  <a href="#">film</a>
+  <br>€7
+</p>
+
+
+
+<form onsubmit="return false" method="post" data-toggle class="interest">
+  <input type="hidden" name="back" value="/e/dogville-2026-09-06">
+  <button name="state" value="interested" aria-pressed="false">Interested</button>
+  <button name="state" value="not_interested" aria-pressed="false">Not interested</button>
+  <span class="count">1 interested</span>
+  
+</form>
+
+
+
+<div class="desc"><p>Ανοιχτό σινεμά στην Πλάκα. Lars von Trier, 2003, με αγγλικούς υπότιτλους.</p></div>
+<hr>
+<p>Posted by <a href="#">Nikos K.</a></p>
+
+
+</main>
+<footer><hr><small>Events in Athens, posted by people we know. Times are Athens local.</small></footer>
+</div>
+</section>
+<script>
+document.querySelectorAll('.pv-toggle').forEach(b => b.addEventListener('click', () => {
+  const s = b.closest('section'); const dark = s.classList.toggle('dark'); s.classList.toggle('light', !dark);
+  b.textContent = dark ? 'Switch to light' : 'Switch to dark';
+}));
+document.querySelectorAll('button[aria-pressed]').forEach(b => b.addEventListener('click', e => {
+  e.preventDefault(); b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+}));
+document.querySelectorAll('a[href="#"]').forEach(a => a.addEventListener('click', e => e.preventDefault()));
+</script>
+</body>
+</html>
