@@ -11,7 +11,9 @@ func TestTheme_SwitchIsOnEveryPage_AndWorksWithoutScript(t *testing.T) {
 	for _, path := range []string{"/", "/upcoming", "/account", "/mine"} {
 		r := v.get(path)
 		assertStatus(t, r, 200)
-		assertForm(t, r, `action="/theme"`, `name="theme"`, `value="light"`, `value="dark"`)
+		// One toggle: without a stored choice it offers dark.
+		assertForm(t, r, `action="/theme"`, `name="theme"`, `value="dark"`)
+		assertNotContains(t, r, `value="light"`)
 		assertNotContains(t, r, `data-theme=`)
 	}
 
@@ -23,8 +25,9 @@ func TestTheme_SwitchIsOnEveryPage_AndWorksWithoutScript(t *testing.T) {
 	}
 	r = v.get("/")
 	assertContains(t, r, `<html lang="en" data-theme="dark">`)
-	assertContains(t, r, `value="dark" class="linklike" aria-pressed="true"`)
-	assertNotContains(t, r, `value="light" class="linklike" aria-pressed="true"`)
+	// Now the toggle offers the way back.
+	assertContains(t, r, `value="light" class="linklike">light</button>`)
+	assertNotContains(t, r, `value="dark" class="linklike"`)
 
 	// Light replaces dark.
 	assertRedirect(t, v.postForm("/theme", url.Values{"theme": {"light"}, "back": {"/"}}), "/")

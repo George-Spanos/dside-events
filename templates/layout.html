@@ -20,8 +20,7 @@
     {{with .Account}}{{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page"><a href="/new">new</a></strong>{{else}}<a href="/new">new</a>{{end}}{{end}}{{end}}
     <form method="post" action="/theme" class="inline theme">
       <input type="hidden" name="back" value="{{.Path}}">
-      · <button name="theme" value="light" class="linklike"{{if eq .Theme "light"}} aria-pressed="true"{{end}}>light</button>
-      · <button name="theme" value="dark" class="linklike"{{if eq .Theme "dark"}} aria-pressed="true"{{end}}>dark</button>
+      · <button name="theme" value="{{if eq .Theme "dark"}}light{{else}}dark{{end}}" class="linklike">{{if eq .Theme "dark"}}light{{else}}dark{{end}}</button>
     </form>
   </nav>
 </header>

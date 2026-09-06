@@ -43,5 +43,14 @@
       .catch(function () { form.dataset.native = '1'; btn.click(); });
   });
 
+
+  // Theme toggle: the server cannot see the system setting, so when no choice
+  // is stored it offers "dark"; flip the offer if the system is already dark.
+  var t = document.querySelector('form.theme button[name="theme"]');
+  if (t && !document.documentElement.hasAttribute('data-theme') &&
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    t.value = 'light'; t.textContent = 'light';
+  }
+
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
 })();

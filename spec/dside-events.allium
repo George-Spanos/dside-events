@@ -457,9 +457,10 @@ rule ChooseTheme {
     @guidance
         -- HTTP: POST /theme with theme=light|dark|auto and back; a one-year
         -- cookie "theme", cleared by auto; 303 back. Any other value is 400.
-        -- Every page carries the two link-styled buttons "light" and "dark"
-        -- in the header, the chosen one bold; the page root gets
-        -- data-theme so the choice overrides prefers-color-scheme.
+        -- Every page carries one link-styled toggle in the header that offers
+        -- the opposite of what is shown ("dark" when no choice is stored, a
+        -- script flips it to "light" on a system already in dark); the page
+        -- root gets data-theme so the choice overrides prefers-color-scheme.
 }
 
 rule DeleteAccount {

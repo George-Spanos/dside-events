@@ -167,5 +167,4 @@ button[aria-pressed="true"] { background: var(--link); border-color: var(--link)
 
 /* Theme switch: buttons that read as links, the chosen one bold. */
 .linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; text-underline-offset: .18em; font: inherit; cursor: pointer; }
-.linklike[aria-pressed="true"] { background: none; color: var(--fg); font-weight: bold; text-decoration: none; }
 .theme { display: inline; }
