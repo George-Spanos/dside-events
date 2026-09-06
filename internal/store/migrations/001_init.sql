@@ -65,16 +65,14 @@ CREATE TABLE follows_posters (
 );
 CREATE INDEX follows_posters_poster ON follows_posters(poster_id);
 
--- An account's relation to an event: following (public, counted) or hidden
--- (private, keeps the event out of that account's feed).
-CREATE TABLE follows_events (
+CREATE TABLE interests (
   account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  state      TEXT NOT NULL CHECK (state IN ('following', 'hidden')),
+  state      TEXT NOT NULL CHECK (state IN ('interested', 'not_interested')),
   created_at INTEGER NOT NULL,
   PRIMARY KEY (account_id, event_id)
 );
-CREATE INDEX follows_events_event_state ON follows_events(event_id, state);
+CREATE INDEX interests_event_state ON interests(event_id, state);
 
 -- Slugs of deleted events. A deleted event's URL answers 404 forever and the
 -- slug is never handed to a new event.
