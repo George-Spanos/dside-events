@@ -48,12 +48,13 @@
   </fieldset>{{end}}
 
   <label for="venue">Venue</label>
-  <input id="venue" name="venue" maxlength="120" required value="{{$f.Venue}}"{{with index $f.Errors "venue"}} aria-invalid="true" aria-describedby="venue-err"{{end}}>
+  <input id="venue" name="venue" maxlength="120" required value="{{$f.Venue}}" aria-describedby="venue-hint{{with index $f.Errors "venue"}} venue-err{{end}}"{{with index $f.Errors "venue"}} aria-invalid="true"{{end}}>
+  <p class="hint" id="venue-hint">The name of the place. Put the address in a link, not here.</p>
   {{with index $f.Errors "venue"}}<p class="error" id="venue-err">{{.}}</p>{{end}}
 
   <label for="price">Price</label>
   <input id="price" name="price" maxlength="60" value="{{$f.Price}}" aria-describedby="price-hint{{with index $f.Errors "price"}} price-err{{end}}"{{with index $f.Errors "price"}} aria-invalid="true"{{end}}>
-  <p class="hint" id="price-hint">Free, €10, or €8–12. Leave empty if unknown.</p>
+  <p class="hint" id="price-hint">Free, €10, or €8–12. Concessions belong in the description. Leave empty if unknown.</p>
   {{with index $f.Errors "price"}}<p class="error" id="price-err">{{.}}</p>{{end}}
 
   <fieldset id="tags"{{with index $f.Errors "tags"}} aria-describedby="tags-err"{{end}}>

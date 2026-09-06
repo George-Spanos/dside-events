@@ -88,8 +88,9 @@ login. Read pages never redirect and never set a cookie.
 List rows (`/` both columns, `/upcoming`, `/mine` Upcoming,
 `/p/{slug}` Upcoming) are `<li>` inside `<ul class="events">` (a date of a
 repeating event: `<li data-series="{id}">`, the id shared by its siblings):
-`<time>`, `<a href="/e/{slug}">`, a `<small class="meta">` of four `<span>`s
-(tags, venue + price, poster, "N following") plus a fifth
+`<time>`, `<a href="/e/{slug}">`, a `<small class="meta">` of `<span>`s in
+this order — tags, venue + price, "N following" (absent while nobody
+follows), poster — plus a further
 `<span class="series">One of N dates</span>` when the row is one of N ≥ 2
 dates, and one toggle form
 `<form method="post" action="/e/{slug}/follow" …>` with hidden
@@ -113,8 +114,8 @@ rather than by posting a `link_url_4` the contract does not define. Slugs match
 `^[a-z0-9-]+-\d{4}-\d{2}-\d{2}(-\d+)?$`; Greek titles are transliterated
 ("Ταξίδι στη Χώρα των Ήχων" → `taxidi-sti-chora-ton-ichon-…`).
 
-Counter copy: "N following", past events "N followed"; at zero the event page
-shows no counter at all. Hidden state copy: "Hidden from Upcoming." Series copy:
+Counter copy: "N following", past events "N followed"; at zero neither the
+event page nor a row shows a counter at all. Hidden state copy: "Hidden from Upcoming." Series copy:
 "One of N dates" (rows and event page), "Follow or hide applies to all N
 dates." (event page). Repeat messages: `weekday` "Pick weekdays from the
 list." / "Pick at least one weekday."; `times` "Pick valid start times, like

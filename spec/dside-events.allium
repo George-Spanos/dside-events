@@ -661,12 +661,16 @@ surface Home {
         -- FollowEvent in the same request. Hide keeps the link accent and a
         -- target no smaller than the text it sits under, because it cannot be
         -- undone from this surface. Days are visibly separated. The follower
-        -- count is always shown as "{n} following", zero included (the founder
-        -- fixed the row as five lines; on 2026-09-06 he ruled their order as
+        -- count reads "{n} following" and is shown only once someone follows:
+        -- at zero the line is absent and the row is four lines, growing to
+        -- five with the first follow. (The founder fixed the row at five
+        -- lines with zero included; on 2026-09-06 he ruled the order as
         -- title, tags, "venue, price", "{n} following", curator, so the count
-        -- no longer sits directly under the curator's name and the name ends
-        -- the row). Filters are plain text links. Pages are served with
-        -- Cache-Control: no-store.
+        -- no longer sits under the curator's name and the name ends the row,
+        -- and then that a zero is not worth showing anywhere — ten rows of
+        -- "0 following" above ten curator names read as a scoreboard, which
+        -- is the thing the product exists to avoid.) Filters are plain text
+        -- links. Pages are served with Cache-Control: no-store.
 
 }
 

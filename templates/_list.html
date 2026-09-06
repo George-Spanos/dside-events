@@ -11,7 +11,7 @@
         <small class="meta">
           <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
           <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
-          <span>{{.Followers}} following</span>
+          {{if .Followers}}<span>{{.Followers}} following</span>{{end}}
           <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
           {{if gt .SeriesCount 1}}<span class="series">One of {{.SeriesCount}} dates</span>{{end}}
         </small>

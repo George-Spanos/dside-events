@@ -198,6 +198,34 @@ func TestCurrentPage_MarkedOnTheLinkItself(t *testing.T) {
 	assertContains(t, v.get("/"), `<a href="#main" class="skip">`)
 }
 
+// spec: Home, UpcomingAll, Event.follower_count
+func TestRow_NoCountUntilSomeoneFollows(t *testing.T) {
+	f := validEvent(t, tomorrow())
+	f.Title = uniqTitle(t, "Uncounted")
+	slug := createEvent(t, asPoster(t, poster1), f)
+	alice := newUser(t)
+
+	// A zero under a curator's name reads as a score, ten rows deep
+	// (founder, 2026-09-06). Nobody yet means the line is not there.
+	row := rowFor(alice.get("/upcoming").Body, slug)
+	if row == "" {
+		t.Fatalf("/upcoming has no row for /e/%s", slug)
+	}
+	if strings.Contains(row, "0 following") || strings.Contains(row, "following</span>") {
+		t.Errorf("row shows a follower count with nobody following\nrow: %s", snippet(row))
+	}
+
+	// It appears with the first follow and goes again when cleared.
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/upcoming"), "/upcoming")
+	if row = rowFor(alice.get("/upcoming").Body, slug); !strings.Contains(row, "1 following") {
+		t.Errorf("followed row lacks \"1 following\"\nrow: %s", snippet(row))
+	}
+	assertRedirect(t, setEventFollow(alice, slug, "clear", "/upcoming"), "/upcoming")
+	if row = rowFor(alice.get("/upcoming").Body, slug); strings.Contains(row, "following</span>") {
+		t.Errorf("row still shows a count after the only follow was cleared\nrow: %s", snippet(row))
+	}
+}
+
 // spec: Home, UpcomingAll, Event.follower_count, Poster
 func TestRow_MetaLineOrder(t *testing.T) {
 	f := validEvent(t, tomorrow())
@@ -209,13 +237,18 @@ func TestRow_MetaLineOrder(t *testing.T) {
 	// with it: the follower count no longer sits directly under the curator's
 	// name, and the name ends the row. Order is the whole obligation here, so
 	// assert the sequence rather than mere presence.
+	// Follow it first: the count line only exists once someone follows
+	// (founder, 2026-09-06), and its position is half of what this asserts.
+	alice := newUser(t)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/upcoming"), "/upcoming")
+
 	// /upcoming renders the same row partial with no ten-event cap, so the
 	// row is always present however many events the suite has posted.
-	row := rowFor(anon(t).get("/upcoming").Body, slug)
+	row := rowFor(alice.get("/upcoming").Body, slug)
 	if row == "" {
 		t.Fatalf("/upcoming has no row for /e/%s", slug)
 	}
-	want := []string{f.Title, f.Tags[0], f.Venue, "€12", "following", poster1.Name}
+	want := []string{f.Title, f.Tags[0], f.Venue, "€12", "1 following", poster1.Name}
 	at := -1
 	for _, s := range want {
 		i := strings.Index(row, s)
