@@ -103,6 +103,24 @@ Makefile; re-running prints `link (unchanged, …)` for curators that already ex
 The service has `restart: always`, so
 Watchtower pulls the new image and restarts the container on its own.
 
+Republishing the seed files after correcting them:
+
+    make prod-reset-events                    # backs up first, then empties the events
+    make prod-seed FILE=seed/jazz-athens-2026-09.tsv
+
+`reset-events` deletes every event and every follow of one, and clears
+`retired_slugs` with them. Clearing the retirements is the point: an ordinary
+delete retires each slug so it can never be reused, and reseeding the same
+events would land on `<slug>-2` and change every public URL. Accounts are not
+touched, so curators keep their secret links and attendees keep their devices —
+but their follows go with the events, and they are not told.
+
+The command refuses without `-yes`, printing how many events it would remove.
+Editing one event in place (`/e/{slug}/edit`) keeps its slug and its follows,
+so prefer that for a small correction; reset is for republishing a whole file.
+Note that a repeating event is one row per date, so a file of 20 lines can be
+38 events.
+
 Backups and schema changes:
 
     make prod-backup                          # consistent snapshot (VACUUM INTO) copied to backups/

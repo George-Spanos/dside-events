@@ -26,7 +26,7 @@ import (
 	"dside.studio/events/internal/store"
 )
 
-const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links | backup -to file"
+const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links | backup -to file | reset-events -yes"
 
 // posterNameMax bounds the curator name, matching the event title limit.
 const posterNameMax = 120
@@ -58,6 +58,8 @@ func run(args []string) error {
 		return posterLinks(cfg)
 	case "backup":
 		return backup(cfg, args[1:])
+	case "reset-events":
+		return resetEvents(cfg, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q\n%s", args[0], usage)
 	}
@@ -248,5 +250,39 @@ func backup(cfg Config, args []string) error {
 		return err
 	}
 	fmt.Printf("backup %s\n", *to)
+	return nil
+}
+
+// resetEvents empties the events so a corrected seed file can be published
+// again. It is the one destructive command, so it does nothing without -yes.
+func resetEvents(cfg Config, args []string) error {
+	fs := flag.NewFlagSet("reset-events", flag.ContinueOnError)
+	yes := fs.Bool("yes", false, "required: delete every event and every follow of one")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	st, ctx, cancel, err := openStore(cfg)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer st.Close()
+	if !*yes {
+		events, err := st.CountEvents(ctx)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("reset-events: this deletes %d events and every follow of them, and cannot be undone.\n"+
+			"Take a backup first, then re-run with -yes:\n"+
+			"  dside-events backup -to /data/before-reset.db\n"+
+			"  dside-events reset-events -yes", events)
+	}
+	events, retired, err := st.ResetEvents(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("deleted %d events\n", events)
+	fmt.Printf("cleared %d retired slugs\n", retired)
+	fmt.Println("curators, their links and every attendee account are untouched")
 	return nil
 }

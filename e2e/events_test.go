@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -479,4 +480,50 @@ func TestAddPoster_CLI_PrintsLink_NoOpForExistingSlug(t *testing.T) {
 		t.Errorf("posters %q and %q share slug or key", d.Slug, e.Slug)
 	}
 	assertStatus(t, newClient(t, s).get("/p/"+e.Slug), 200)
+}
+
+// spec: Event, Event.slug, CreateEvent, SlugsUnique
+func TestResetEvents_CLI_ClearsEventsAndFreesSlugs(t *testing.T) {
+	s := startServer(t)
+	p := addPoster(t, s, "Reset R.", uniqSlug("reset"))
+	c := openLink(t, s, p.Link)
+
+	f := validEvent(t, tomorrow())
+	f.Title = uniqTitle(t, "Before Reset")
+	slug := createEvent(t, c, f)
+	v := newClient(t, s)
+	assertStatus(t, v.get("/e/"+slug), 200)
+
+	// Without -yes it refuses and changes nothing: this is the one command
+	// that destroys data.
+	out, err := runCLI(s, "reset-events")
+	if err == nil {
+		t.Errorf("reset-events ran without -yes\nstdout: %s", out)
+	}
+	assertStatus(t, v.get("/e/"+slug), 200)
+
+	// Delete it through the app first: that retires the slug, so republishing
+	// on its own would land on "<slug>-2" and change the public URL. This is
+	// the case reset has to undo, and the reason it clears retired_slugs.
+	assertRedirect(t, c.postForm("/e/"+slug+"/delete", url.Values{"confirm": {"1"}}), "/")
+	assertStatus(t, v.get("/e/"+slug), 404)
+	if got := createEvent(t, c, f); got == slug {
+		t.Fatalf("slug %q was reused straight after a delete: it should have been retired", slug)
+	}
+
+	if out, err = runCLI(s, "reset-events", "-yes"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "cleared 1 retired slugs") {
+		t.Errorf("reset-events did not clear the retirement\nstdout: %s", out)
+	}
+	assertStatus(t, v.get("/e/"+slug), 404)
+
+	// The curator survives with the same link, and republishing now reclaims
+	// the original slug.
+	c2 := openLink(t, s, p.Link)
+	if got := createEvent(t, c2, f); got != slug {
+		t.Errorf("republished event got slug %q, want the original %q", got, slug)
+	}
+	assertStatus(t, v.get("/e/"+slug), 200)
 }

@@ -298,3 +298,40 @@ func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 	}
 	return tx.Commit()
 }
+
+// ResetEvents removes every event so a seed file can be published again, and
+// clears retired_slugs with them. Clearing the retirements is the point: a
+// plain delete retires each slug, and the next seed of the same events would
+// then land on "<slug>-2" and change every public URL. Links, tags and
+// follows cascade. Accounts and sessions are untouched, so curators keep
+// their secret links and attendees keep their devices.
+func (s *Store) ResetEvents(ctx context.Context) (events, retired int64, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, "DELETE FROM events")
+	if err != nil {
+		return 0, 0, err
+	}
+	if events, err = res.RowsAffected(); err != nil {
+		return 0, 0, err
+	}
+	res, err = tx.ExecContext(ctx, "DELETE FROM retired_slugs")
+	if err != nil {
+		return 0, 0, err
+	}
+	if retired, err = res.RowsAffected(); err != nil {
+		return 0, 0, err
+	}
+	return events, retired, tx.Commit()
+}
+
+// CountEvents is how many events exist, so a destructive command can say what
+// it is about to remove before it removes it.
+func (s *Store) CountEvents(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM events").Scan(&n)
+	return n, err
+}
