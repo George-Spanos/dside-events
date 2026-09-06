@@ -40,7 +40,8 @@ Most individuals just want to discover events that might interest them.
 - Designed for mobile-first, responsive design. 
 - The UI is essentially two lists on one screen: what's coming (the next 10) and what you marked.
   Click an event → its info page. THAT'S IT.
-- Minimal CSS: system font stack, underlined text links, no cards/shadows/animations/hero.
+- Minimal CSS: system font stack, underlined text links, no cards/shadows/hero. Motion only as a
+  response to an action or a move between pages, 200 ms at most, none on load, off under reduced motion.
   Filters are plain text links, not chip widgets. No images anywhere.
 
 ## 2. Stack 

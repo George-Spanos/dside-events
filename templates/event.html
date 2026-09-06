@@ -1,6 +1,6 @@
 {{define "title"}}{{.Event.Title}} · dside events{{end}}
 {{define "content"}}
-<h1>{{.Event.Title}}</h1>
+<h1 style="view-transition-name: e-{{.Event.Slug}}">{{.Event.Title}}</h1>
 <p>
   <time datetime="{{iso .Event.Start}}">{{with dayLabel .Event.Start}}{{.}} · {{end}}{{day .Event.Start}}, {{clock .Event.Start}}</time><br>
   {{.Event.Venue}}<br>

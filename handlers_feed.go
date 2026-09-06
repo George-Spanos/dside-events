@@ -45,7 +45,8 @@ type DayGroup struct {
 
 // DayList is what the "daylist" partial renders.
 type DayList struct {
-	Days []DayGroup
+	Days  []DayGroup
+	Morph bool // primary list of the page: titles carry a view-transition-name
 }
 
 // Filter is one plain-text link of the filter row.
@@ -106,6 +107,10 @@ func toggleRows(events []store.Event, back string) []EventRow {
 	}
 	return out
 }
+
+// morph marks a list as the page's primary one, so its titles carry a
+// view-transition-name and travel to the event heading on navigation.
+func (s *Server) morph(l DayList) DayList { l.Morph = true; return l }
 
 // groupByDay splits chronologically sorted rows into Athens days.
 func (s *Server) groupByDay(rows []EventRow) DayList {
@@ -202,7 +207,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	if tag != "" {
 		page.AllHref = "/upcoming?tag=" + url.QueryEscape(tag)
 	}
-	page.Upcoming = s.groupByDay(toggleRows(events, back))
+	page.Upcoming = s.morph(s.groupByDay(toggleRows(events, back)))
 	if acct != nil {
 		interested, err := s.store.InterestedEvents(r.Context(), acct.ID)
 		if err != nil {
@@ -229,7 +234,7 @@ func (s *Server) upcoming(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	page := feedPage{Base: s.base(r), Filters: s.filters("/upcoming", tag), TagFollow: follow, Empty: empty,
-		List: s.groupByDay(toggleRows(events, r.URL.RequestURI()))}
+		List: s.morph(s.groupByDay(toggleRows(events, r.URL.RequestURI())))}
 	return s.render(w, r, http.StatusOK, "feed", page)
 }
 
@@ -253,7 +258,7 @@ func (s *Server) following(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		page.List = s.groupByDay(toggleRows(events, r.URL.RequestURI()))
+		page.List = s.morph(s.groupByDay(toggleRows(events, r.URL.RequestURI())))
 	}
 	return s.render(w, r, http.StatusOK, "feed", page)
 }
@@ -282,7 +287,7 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	upcoming, past := s.splitPast(interested)
-	page := minePage{Base: s.base(r), Upcoming: s.groupByDay(toggleRows(upcoming, r.URL.RequestURI())),
+	page := minePage{Base: s.base(r), Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))),
 		Past: rows(past), Hidden: rows(hidden), Empty: len(interested) == 0 && len(hidden) == 0}
 	return s.render(w, r, http.StatusOK, "mine", page)
 }
@@ -358,7 +363,7 @@ func (s *Server) poster(w http.ResponseWriter, r *http.Request) error {
 	}
 	upcoming, past := s.splitPast(events)
 	page := posterPage{Base: s.base(r), Poster: posterRef{p.Name, p.Slug},
-		Upcoming: s.groupByDay(toggleRows(upcoming, r.URL.RequestURI())), Past: rows(past)}
+		Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))), Past: rows(past)}
 	if acct == nil || acct.ID != p.ID {
 		page.Follow = &followView{Kind: "poster", Key: p.Slug, Back: r.URL.Path, Label: p.Name}
 		if acct != nil {

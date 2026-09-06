@@ -320,13 +320,13 @@ func TestInterested_AnonMarkStartsAccount(t *testing.T) {
 // ---- row toggles --------------------------------------------------------------
 
 var (
-	pressedRowButton   = regexp.MustCompile(`(?s)<button[^>]*>\s*✓ Interested\s*</button>`)
-	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*>\s*Interested\s*</button>`)
+	pressedRowButton   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
+	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Interested\s*</button>`)
 )
 
 // assertRowToggle checks one list row against the row-toggle contract: a
 // POST form to /e/{slug}/interest with a hidden back field and a single
-// state button that is either pressed (✓ Interested, aria-pressed="true",
+// state button that is either pressed (aria-pressed="true", the check mark is drawn by CSS,
 // value="clear") or not (Interested, aria-pressed="false",
 // value="interested"). Rows never offer not_interested.
 func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
@@ -353,13 +353,13 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 		fail("offers not_interested; that belongs to the event page only")
 	}
 	if pressed {
-		for _, want := range []string{`value="clear"`, `aria-pressed="true"`, "✓ Interested"} {
+		for _, want := range []string{`value="clear"`, `aria-pressed="true"`} {
 			if !strings.Contains(row, want) {
 				fail("is marked but lacks " + want)
 			}
 		}
 		if !pressedRowButton.MatchString(row) {
-			fail("has no <button>✓ Interested</button>")
+			fail("has no pressed <button>Interested</button>")
 		}
 		for _, no := range []string{`value="interested"`, `aria-pressed="false"`} {
 			if strings.Contains(row, no) {
@@ -375,7 +375,7 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 		if !unpressedRowButton.MatchString(row) {
 			fail("has no <button>Interested</button>")
 		}
-		for _, no := range []string{`value="clear"`, `aria-pressed="true"`, "✓"} {
+		for _, no := range []string{`value="clear"`, `aria-pressed="true"`} {
 			if strings.Contains(row, no) {
 				fail("is unmarked but has " + no)
 			}
@@ -494,8 +494,8 @@ func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 }
 
 var (
-	pressedInterested      = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*✓ Interested\s*</button>`)
-	pressedNotInterested   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*✓ Not interested\s*</button>`)
+	pressedInterested      = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
+	pressedNotInterested   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Not interested\s*</button>`)
 	unpressedInterested    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Interested\s*</button>`)
 	unpressedNotInterested = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Not interested\s*</button>`)
 )
@@ -515,8 +515,8 @@ func TestEventPage_PressedButtonShowsCheck(t *testing.T) {
 				t.Errorf("after %s: event page lacks a button matching %s\nbody: %s", state, re, snippet(r.Body))
 			}
 		}
-		if n := strings.Count(r.Body, "✓"); (state == "clear" && n != 0) || (state != "clear" && n != 1) {
-			t.Errorf("after %s: event page shows ✓ %d times", state, n)
+		if n := strings.Count(r.Body, `aria-pressed="true"`); (state == "clear" && n != 0) || (state != "clear" && n != 1) {
+			t.Errorf("after %s: event page has %d pressed buttons", state, n)
 		}
 	}
 	check("clear", unpressedInterested, unpressedNotInterested)
@@ -530,13 +530,13 @@ func TestEventPage_PressedButtonShowsCheck(t *testing.T) {
 	assertRedirect(t, setInterest(alice, slug, "clear", page), page)
 	check("clear", unpressedInterested, unpressedNotInterested)
 
-	// The ✓ is alice's alone.
+	// The pressed state is alice's alone.
 	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
 	for name, c := range map[string]*client{"anon": anon(t), "bob": newUser(t)} {
 		r := c.get(page)
 		assertStatus(t, r, 200)
-		if strings.Contains(r.Body, "✓") {
-			t.Errorf("%s sees a ✓ on the event page after alice's mark", name)
+		if strings.Contains(r.Body, `aria-pressed="true"`) {
+			t.Errorf("%s sees a pressed button on the event page after alice's mark", name)
 		}
 	}
 }

@@ -6,7 +6,7 @@
   <li>
     <time datetime="{{iso .Start}}">{{clock .Start}}</time>
     <div>
-      <a href="/e/{{.Slug}}">{{.Title}}</a>
+      <a href="/e/{{.Slug}}"{{if $.Morph}} style="view-transition-name: e-{{.Slug}}"{{end}}>{{.Title}}</a>
       <small class="meta">
         <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
         <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
@@ -16,7 +16,7 @@
     </div>
     {{if .Back}}<form method="post" action="/e/{{.Slug}}/interest" data-toggle class="row-toggle">
       <input type="hidden" name="back" value="{{.Back}}">
-      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}">{{if .Marked}}✓ {{end}}Interested</button>
+      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}">Interested</button>
     </form>{{end}}
   </li>
   {{end}}

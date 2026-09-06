@@ -168,3 +168,51 @@ button[aria-pressed="true"] { background: var(--link); border-color: var(--link)
 /* Theme switch: buttons that read as links, the chosen one bold. */
 .linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; text-underline-offset: .18em; font: inherit; cursor: pointer; }
 .theme { display: inline; }
+
+/* Motion. Basis: Devouring Details (Rauno Freiberg): one curve, three durations; motion only
+   for a state change you caused or a view you moved to; nothing on load; all off under
+   reduced motion. Founder pass 2026-09-06: no fade on the counter, hover on the toggle. */
+:root { --ease: cubic-bezier(.2, 0, 0, 1); --t-out: 120ms; --t: 150ms; }
+
+/* The inversion is the acknowledgement: colour only, no geometry. */
+button:not(.linklike) {
+  transition: background-color var(--t) var(--ease), border-color var(--t) var(--ease),
+              color var(--t) var(--ease), transform var(--t-out) var(--ease);
+}
+/* Proportional press: instant down, eased release. */
+button:not(.linklike):active { transform: scale(.97); transition-duration: 0s; }
+
+/* One change, not two: the check mark appears with the fill, in a slot that exists in
+   both states, so the button never changes width or weight. */
+button[aria-pressed]::before {
+  content: ""; display: inline-block; width: 1.15em; opacity: 0;
+  transition: opacity var(--t) var(--ease);
+}
+button[aria-pressed="true"]::before { content: "✓" / ""; opacity: 1; }
+button[aria-pressed="true"] { font-weight: inherit; }
+
+/* Hover is routine: pointer devices only, never touch. Links show the full underline at
+   once and fade it out; the Interested toggle takes the accent on border and text. */
+@media (hover: hover) {
+  a, .linklike { transition: text-decoration-color var(--t) var(--ease); }
+  a:hover, .linklike:hover { text-decoration-color: var(--link); transition-duration: 0s; }
+  button:not(.linklike):hover { border-color: var(--link); color: var(--link); }
+  button[aria-pressed="true"]:hover { background: color-mix(in srgb, var(--link) 82%, var(--fg)); border-color: color-mix(in srgb, var(--link) 82%, var(--fg)); color: var(--bg); }
+}
+
+/* Spatial consistency between documents (Chrome, Safari; others navigate as before):
+   200 ms root crossfade, header and filters stay still, the pressed title travels to
+   the event heading (per-slug view-transition-name set inline by the templates). */
+@view-transition { navigation: auto; }
+::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2, 0, 0, 1); }
+header { view-transition-name: header; }
+.filters { view-transition-name: filters; }
+.events li > div > a:first-child { display: inline-block; }
+
+/* Motion is optional: final state immediately, page transitions included. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { transition: none !important; animation: none !important; }
+  button:active { transform: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
