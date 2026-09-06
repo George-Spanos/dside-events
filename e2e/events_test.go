@@ -15,10 +15,10 @@ func TestNewEvent_UserForbidden(t *testing.T) {
 	assertStatus(t, u.get("/new"), 403)
 	f := validEvent(t, tomorrow())
 	assertStatus(t, u.postForm("/new", f.values()), 403)
-	assertNotContains(t, anon(t).get("/"), f.Title)
+	assertNotListed(t, anon(t), "/upcoming", f.Title)
 }
 
-// spec: CreateEvent, Event, EventComposer, EventDetail, Feed, PosterPage
+// spec: CreateEvent, Event, EventComposer, EventDetail, UpcomingAll, PosterPage
 func TestCreateEvent_Success(t *testing.T) {
 	p := asPoster(t, poster1)
 	r := p.get("/new")
@@ -32,12 +32,12 @@ func TestCreateEvent_Success(t *testing.T) {
 	}
 	assertNotContains(t, r, `name="link_url_6"`)
 	// max_tags is a server rule (see the validation table); every tag is offered.
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition"} {
 		assertContains(t, r, `value="`+tag+`"`)
 	}
 
 	f := validEvent(t, tomorrow())
-	f.Tags = []string{"concert", "party"}
+	f.Tags = []string{"concert", "theater"}
 	slug := createEvent(t, p, f)
 	if !slugShape.MatchString(slug) {
 		t.Errorf("slug %q does not match %s", slug, slugShape)
@@ -53,12 +53,13 @@ func TestCreateEvent_Success(t *testing.T) {
 	assertContains(t, r, f.Price)
 	assertContains(t, r, f.Description)
 	assertContains(t, r, `href="/?tag=concert"`)
-	assertContains(t, r, `href="/?tag=party"`)
+	assertContains(t, r, `href="/?tag=theater"`)
 	assertContains(t, r, `href="`+f.LinkURLs[0]+`"`)
 	assertContains(t, r, poster1.Name)
 
 	v := anon(t)
-	assertContains(t, v.get("/"), f.Title)
+	assertListed(t, v, "/upcoming", f.Title)
+	assertListed(t, v, "/upcoming?tag=theater", f.Title)
 	assertContains(t, v.get("/p/"+poster1.Slug), f.Title)
 }
 
@@ -84,7 +85,6 @@ func TestCreateEvent_ValidationErrors(t *testing.T) {
 		{"price too long", func(f *eventForm) { f.Price = long(61) }},
 		{"no tags", func(f *eventForm) { f.Tags = nil }},
 		{"unknown tag", func(f *eventForm) { f.Tags = []string{"opera"} }},
-		{"five tags", func(f *eventForm) { f.Tags = []string{"concert", "theater", "film", "talk", "party"} }},
 		{"javascript link", func(f *eventForm) { f.LinkURLs = []string{"javascript:alert(1)"} }},
 		{"ftp link", func(f *eventForm) { f.LinkURLs = []string{"ftp://example.test/x"} }},
 		{"not a url", func(f *eventForm) { f.LinkURLs = []string{"not a url"} }},
@@ -109,7 +109,7 @@ func TestCreateEvent_ValidationErrors(t *testing.T) {
 			assertForm(t, r, `action="/new"`)
 			// Nothing was created.
 			if strings.TrimSpace(f.Title) != "" {
-				assertNotContains(t, anon(t).get("/"), f.Title)
+				assertNotListed(t, anon(t), "/upcoming", f.Title)
 			}
 		})
 	}
@@ -136,11 +136,11 @@ func TestCreateEvent_DuplicateRejected(t *testing.T) {
 	assertStatus(t, r, 422)
 	assertContains(t, r, "already posted")
 
-	// The original is untouched and the feed shows it once.
-	r = anon(t).get("/")
+	// The original is untouched and the list shows it once.
+	r = anon(t).get("/upcoming")
 	assertStatus(t, r, 200)
 	if n := strings.Count(r.Body, `href="/e/`+slug+`"`); n != 1 {
-		t.Errorf("feed links to /e/%s %d times, want 1", slug, n)
+		t.Errorf("/upcoming links to /e/%s %d times, want 1", slug, n)
 	}
 }
 
@@ -200,7 +200,7 @@ func TestCreateEvent_GreekTitleSlug(t *testing.T) {
 	assertContains(t, r, f.Title)
 }
 
-// spec: EditEvent, EventEditor, EventDetail, Feed
+// spec: EditEvent, EventEditor, EventDetail, UpcomingAll
 func TestEditEvent_OwnerEdits_SlugImmutable(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
@@ -238,11 +238,11 @@ func TestEditEvent_OwnerEdits_SlugImmutable(t *testing.T) {
 	assertContains(t, r, `href="`+edited.LinkURLs[0]+`"`)
 	assertNotContains(t, r, f.LinkURLs[0])
 
-	feed := anon(t).get("/")
+	feed := anon(t).get("/upcoming")
 	assertContains(t, feed, edited.Title)
 	assertNotContains(t, feed, f.Title)
 	if n := strings.Count(feed.Body, `href="/e/`+slug+`"`); n != 1 {
-		t.Errorf("feed links to /e/%s %d times, want 1", slug, n)
+		t.Errorf("/upcoming links to /e/%s %d times, want 1", slug, n)
 	}
 }
 
@@ -316,7 +316,7 @@ func TestDeleteEvent_OwnerDeletes_CascadesInterest(t *testing.T) {
 	v := anon(t)
 	assertStatus(t, v.get("/e/"+slug), 404)
 	assertStatus(t, p.get("/e/"+slug+"/edit"), 404)
-	assertNotContains(t, v.get("/"), f.Title)
+	assertNotListed(t, v, "/upcoming", f.Title)
 	assertNotContains(t, v.get("/p/"+poster1.Slug), f.Title)
 	assertNotContains(t, alice.get("/mine"), f.Title)
 

@@ -14,13 +14,14 @@ import (
 var templateFS embed.FS
 
 // pageNames are the templates that define "title" and "content" blocks.
-var pageNames = []string{"feed", "event", "poster", "mine", "account", "eventform", "error", "offline"}
+var pageNames = []string{"home", "feed", "event", "poster", "mine", "account", "eventform", "error", "offline"}
 
 // Base is embedded in every page's data.
 type Base struct {
 	Account *AccountView
 	Path    string
 	Version string
+	Wide    bool // / only: two columns need a wider body
 }
 
 // AccountView is what templates know about the viewer.
@@ -61,6 +62,8 @@ func parseTemplates(funcs template.FuncMap) (map[string]*template.Template, erro
 func (s *Server) funcs() template.FuncMap {
 	return template.FuncMap{
 		"day":        func(t time.Time) string { return t.In(s.loc).Format("Monday 2 January") },
+		"weekday":    func(t time.Time) string { return t.In(s.loc).Format("Monday") },
+		"date":       func(t time.Time) string { return t.In(s.loc).Format("2 January") },
 		"clock":      func(t time.Time) string { return t.In(s.loc).Format("15:04") },
 		"iso":        func(t time.Time) string { return t.In(s.loc).Format(time.RFC3339) },
 		"dayLabel":   func(t time.Time) string { return s.dayLabel(t, time.Now()) },

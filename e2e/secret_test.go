@@ -61,14 +61,14 @@ func TestStartAccount_InterestFromAnonCreatesAccount(t *testing.T) {
 	}
 }
 
-// spec: StartAccount, Visitor, Account, Session, FollowTag, AccountPage, Feed
+// spec: StartAccount, Visitor, Account, Session, FollowTag, AccountPage, UpcomingAll
 func TestStartAccount_FollowFromAnonCreatesAccount(t *testing.T) {
 	f := validEvent(t, tomorrow())
-	f.Tags = []string{"workshop"}
+	f.Tags = []string{"exhibition"}
 	createEvent(t, asPoster(t, poster1), f)
 
 	v := anon(t)
-	r := follow(v, "tag", "workshop", "1", "/following")
+	r := follow(v, "tag", "exhibition", "1", "/following")
 	assertRedirect(t, r, "/following")
 	assertSessionCookieFlags(t, r)
 	if v.cookie("session") == nil {
@@ -80,7 +80,7 @@ func TestStartAccount_FollowFromAnonCreatesAccount(t *testing.T) {
 	assertContains(t, r, f.Title)
 	r = v.get("/account")
 	assertStatus(t, r, 200)
-	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="workshop"`, `value="0"`)
+	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="exhibition"`, `value="0"`)
 	assertNoCopy(t, r, copyAccountNone)
 
 	// A follow that fails (unknown target) from a fresh visitor gives 404 and
@@ -113,7 +113,7 @@ func TestStartAccount_DifferentVisitorsGetDifferentAccounts(t *testing.T) {
 	}
 }
 
-// spec: MyEvents, Feed, AccountPage, Visitor
+// spec: MyEvents, Home, UpcomingAll, AccountPage, Visitor
 func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 	v := anon(t)
 
@@ -137,7 +137,7 @@ func TestReadPages_NoSession_200WithEmptyCopy_NeverRedirect(t *testing.T) {
 	assertNoForm(t, r, `action="/forget"`)
 	assertNoForm(t, r, `action="/account/delete"`)
 
-	for _, path := range []string{"/", "/mine", "/following", "/account"} {
+	for _, path := range []string{"/", "/upcoming", "/mine", "/following", "/account"} {
 		r := v.get(path)
 		assertStatus(t, r, 200)
 		if sessionSetCookie(r) != "" || v.cookie("session") != nil {
@@ -197,7 +197,7 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 
 	phone := newUser(t)
 	assertRedirect(t, setInterest(phone, slug, "interested", page), page)
-	assertRedirect(t, follow(phone, "tag", "talk", "1", "/account"), "/account")
+	assertRedirect(t, follow(phone, "tag", "film", "1", "/account"), "/account")
 	link, _ := secretLink(t, phone)
 
 	laptop := openLink(t, shared, link)
@@ -208,7 +208,7 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	r = laptop.get("/account")
-	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="talk"`, `value="0"`)
+	assertForm(t, r, `action="/follow"`, `value="tag"`, `value="film"`, `value="0"`)
 	link2, _ := secretLink(t, laptop)
 	if link2 != link {
 		t.Errorf("laptop sees link %q, phone %q; want the same account", link2, link)
@@ -422,7 +422,7 @@ func TestSessionPosts_WithoutSession_RedirectToAccount(t *testing.T) {
 	assertCopy(t, r, copyAccountNone)
 }
 
-// spec: Session, AccountPage, MyEvents, Feed, EventComposer, PwaAssets
+// spec: Session, AccountPage, MyEvents, Home, UpcomingAll, EventComposer, PwaAssets
 func TestLoginRoutes_Gone404(t *testing.T) {
 	v := anon(t)
 	for _, path := range []string{"/login", "/login/code", "/logout", "/login?next=/mine"} {
@@ -443,6 +443,7 @@ func TestLoginRoutes_Gone404(t *testing.T) {
 	u := newUser(t)
 	for name, r := range map[string]resp{
 		"/ anon":         v.get("/"),
+		"/upcoming anon": v.get("/upcoming"),
 		"/e/{slug} anon": v.get("/e/" + slug),
 		"/mine anon":     v.get("/mine"),
 		"/account anon":  v.get("/account"),

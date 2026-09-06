@@ -19,6 +19,21 @@ Without make:
 Prints exactly one line to stdout (`listening on http://127.0.0.1:8080`) and
 logs to stderr.
 
+## Pages
+
+| Path | What it shows |
+|---|---|
+| `/`, `/?tag=x` | home: the next 10 upcoming events (a fixed founder decision, not a setting) next to the events you marked, side by side; "All upcoming events →" leads to the full list |
+| `/upcoming`, `/upcoming?tag=x` | all upcoming events, day-grouped |
+| `/following` | all upcoming events from the tags and curators you follow |
+| `/mine` | your Upcoming, Past and Hidden events |
+| `/e/{slug}` | one event; Interested / Not interested |
+| `/p/{slug}` | a curator's events |
+| `/account` | your secret link, follows, forget / delete |
+
+Every upcoming row, on every page, carries the Interested toggle; a pressed
+one reads `✓ Interested`. Unknown `tag` values are 404.
+
 ## Accounts
 
 There is no sign-up and no email. Everyone browses; the first press of
@@ -87,8 +102,8 @@ printed inside the curators' secret links.
 ## Layout
 
     main.go config.go server.go errors.go templates.go auth.go   wiring, routing, middleware, sessions
-    handlers_*.go event_form.go slug.go tags.go                 HTTP handlers, validation
-    templates/                                                  html/template pages
+    handlers_*.go event_form.go slug.go tags.go                 HTTP handlers, validation (handlers_feed.go: home, upcoming, following, mine, event, poster)
+    templates/                                                  html/template pages; _list.html is the one row markup, _filters.html the filter row
     static/                                                     style.css app.js sw.js manifest icon
     internal/store                                              SQLite (modernc.org/sqlite), migrations
     e2e/                                                        black-box HTTP suite (`go test ./e2e/...`)

@@ -64,12 +64,13 @@ docker-poster-link: ## new curator link inside docker: make docker-poster-link S
 prod-up: ## start production from the published image (set BASE_URL to the public address)
 	$(PROD) up -d
 
-prod-curators: ## create the production curators (idempotent) and print their secret links
-	@for name in $(CURATORS); do $(PROD) exec -T events /dside-events add-poster -name "$$name"; done
+prod-curators: ## create the production curators (idempotent), print their secret links and save them to curators.txt (gitignored)
+	@for name in $(CURATORS); do $(PROD) exec -T events /dside-events add-poster -name "$$name"; done | tee -a curators.txt
 
-prod-poster-link: ## new secret link for a production curator: make prod-poster-link SLUG=george-spanos
+prod-poster-link: ## new secret link for a production curator, also appended to curators.txt: make prod-poster-link SLUG=george-spanos
 	@test -n "$(SLUG)" || { echo 'usage: make prod-poster-link SLUG=george-spanos'; exit 2; }
-	$(PROD) exec -T events /dside-events poster-link -slug "$(SLUG)"
+	@echo "poster $(SLUG)" >> curators.txt
+	$(PROD) exec -T events /dside-events poster-link -slug "$(SLUG)" | tee -a curators.txt
 
 clean: ## remove the binary and the dev database
 	rm -rf bin $(DB_PATH) $(DB_PATH)-wal $(DB_PATH)-shm

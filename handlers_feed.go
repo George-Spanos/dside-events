@@ -8,17 +8,20 @@ import (
 	"dside.studio/events/internal/store"
 )
 
-// InterestView drives the "interest" partial (buttons + counter).
+const homeListSize = 10 // founder decision, deliberately not configurable
+
+// InterestView drives the "interest" partial on the event page (both
+// buttons + counter).
 type InterestView struct {
-	Action  string
-	Back    string
-	State   string // "", interested, not_interested
-	Count   int
-	Past    bool
-	Compact bool // /mine rows: only the Interested button, no counter
+	Action string
+	Back   string
+	State  string // "", interested, not_interested
+	Count  int
+	Past   bool
 }
 
-// EventRow is one line of the programme list.
+// EventRow is one line of the programme list. Back is non-empty for upcoming
+// rows, which carry the Interested toggle posting back to that URL.
 type EventRow struct {
 	Slug       string
 	Title      string
@@ -26,7 +29,11 @@ type EventRow struct {
 	Venue      string
 	Price      string
 	Interested int
-	Interest   *InterestView
+	Tags       []string
+	PosterName string
+	PosterSlug string
+	Marked     bool   // the viewer is interested
+	Back       string // current path incl. query; "" for past rows (no toggle)
 }
 
 // DayGroup is the rows of one Athens day.
@@ -39,7 +46,6 @@ type DayGroup struct {
 // DayList is what the "daylist" partial renders.
 type DayList struct {
 	Days []DayGroup
-	Sub  bool // day headings are h3, nested under a section h2 (/mine)
 }
 
 // Filter is one plain-text link of the filter row.
@@ -55,6 +61,7 @@ type tagFollowView struct {
 	Following bool
 }
 
+// feedPage renders /upcoming and /following: one full list.
 type feedPage struct {
 	Base
 	Filters   []Filter
@@ -63,8 +70,41 @@ type feedPage struct {
 	Empty     string
 }
 
+// homePage renders /: Mine and Upcoming side by side.
+type homePage struct {
+	Base
+	Filters   []Filter
+	TagFollow *tagFollowView
+	Mine      DayList // empty without a session or without upcoming marks
+	Upcoming  DayList
+	Empty     string
+	AllHref   string // /upcoming, with the tag filter when set
+}
+
 func row(e store.Event) EventRow {
-	return EventRow{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price, Interested: e.Interested}
+	return EventRow{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price, Interested: e.Interested,
+		Tags: e.Tags, PosterName: e.PosterName, PosterSlug: e.PosterSlug}
+}
+
+// rows converts past events: no toggle.
+func rows(events []store.Event) []EventRow {
+	out := make([]EventRow, 0, len(events))
+	for _, e := range events {
+		out = append(out, row(e))
+	}
+	return out
+}
+
+// toggleRows converts upcoming events; every row carries the Interested
+// toggle, which returns the visitor to back.
+func toggleRows(events []store.Event, back string) []EventRow {
+	out := make([]EventRow, 0, len(events))
+	for _, e := range events {
+		rw := row(e)
+		rw.Marked, rw.Back = e.ViewerState == store.Interested, back
+		out = append(out, rw)
+	}
+	return out
 }
 
 // groupByDay splits chronologically sorted rows into Athens days.
@@ -105,49 +145,92 @@ func viewerID(acct *store.Account) int64 {
 	return acct.ID
 }
 
+// filters builds the filter row. On /upcoming the tag links stay on the
+// full list; everywhere else they lead home.
 func (s *Server) filters(path, tag string) []Filter {
+	base := "/"
+	if path == "/upcoming" {
+		base = "/upcoming"
+	}
 	fs := []Filter{
-		{Label: "all", Href: "/", Active: path == "/" && tag == ""},
+		{Label: "all", Href: base, Active: path == base && tag == ""},
 		{Label: "following", Href: "/following", Active: path == "/following"},
 	}
 	for _, t := range tags {
-		fs = append(fs, Filter{Label: t, Href: "/?tag=" + url.QueryEscape(t), Active: path == "/" && tag == t})
+		fs = append(fs, Filter{Label: t, Href: base + "?tag=" + url.QueryEscape(t), Active: path == base && tag == t})
 	}
 	return fs
 }
 
-func (s *Server) feed(w http.ResponseWriter, r *http.Request) error {
+// tagFilter validates ?tag= and, when set, returns the Follow toggle and the
+// empty copy for that tag. Unknown tags are a 404.
+func (s *Server) tagFilter(r *http.Request, acct *store.Account) (tag string, follow *tagFollowView, empty string, err error) {
+	tag = r.URL.Query().Get("tag")
+	if tag == "" {
+		return "", nil, "No upcoming events yet. Check back soon.", nil
+	}
+	if !validTag(tag) {
+		return "", nil, "", errNotFound
+	}
+	follow = &tagFollowView{Tag: tag, Back: r.URL.RequestURI()}
+	if acct != nil {
+		follows, err := s.store.Follows(r.Context(), acct.ID)
+		if err != nil {
+			return "", nil, "", err
+		}
+		follow.Following = follows.HasTag(tag)
+	}
+	return tag, follow, "No upcoming events tagged " + tag + ".", nil
+}
+
+// home is the front page: the visitor's next marked events (when any) next
+// to the next homeListSize upcoming events.
+func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
-	tag := r.URL.Query().Get("tag")
-	if tag != "" && !validTag(tag) {
-		return errNotFound
+	tag, follow, empty, err := s.tagFilter(r, acct)
+	if err != nil {
+		return err
+	}
+	back := r.URL.RequestURI()
+	events, err := s.store.Feed(r.Context(), store.FeedOpts{From: s.midnight(time.Now()), Tag: tag,
+		ViewerID: viewerID(acct), Limit: homeListSize})
+	if err != nil {
+		return err
+	}
+	page := homePage{Base: s.base(r), Filters: s.filters("/", tag), TagFollow: follow, Empty: empty, AllHref: "/upcoming"}
+	page.Wide = true
+	if tag != "" {
+		page.AllHref = "/upcoming?tag=" + url.QueryEscape(tag)
+	}
+	page.Upcoming = s.groupByDay(toggleRows(events, back))
+	if acct != nil {
+		interested, err := s.store.InterestedEvents(r.Context(), acct.ID)
+		if err != nil {
+			return err
+		}
+		mine, _ := s.splitPast(interested)
+		if len(mine) > homeListSize {
+			mine = mine[:homeListSize]
+		}
+		page.Mine = s.groupByDay(toggleRows(mine, back))
+	}
+	return s.render(w, r, http.StatusOK, "home", page)
+}
+
+// upcoming lists all upcoming events, optionally narrowed to one tag.
+func (s *Server) upcoming(w http.ResponseWriter, r *http.Request) error {
+	acct := accountFrom(r)
+	tag, follow, empty, err := s.tagFilter(r, acct)
+	if err != nil {
+		return err
 	}
 	events, err := s.store.Feed(r.Context(), store.FeedOpts{From: s.midnight(time.Now()), Tag: tag, ViewerID: viewerID(acct)})
 	if err != nil {
 		return err
 	}
-	page := feedPage{Base: s.base(r), Filters: s.filters("/", tag), Empty: "No upcoming events yet. Check back soon."}
-	if tag != "" {
-		page.Empty = "No upcoming events tagged " + tag + "."
-		page.TagFollow = &tagFollowView{Tag: tag, Back: r.URL.RequestURI()}
-		if acct != nil {
-			follows, err := s.store.Follows(r.Context(), acct.ID)
-			if err != nil {
-				return err
-			}
-			page.TagFollow.Following = follows.HasTag(tag)
-		}
-	}
-	page.List = s.groupByDay(rows(events))
+	page := feedPage{Base: s.base(r), Filters: s.filters("/upcoming", tag), TagFollow: follow, Empty: empty,
+		List: s.groupByDay(toggleRows(events, r.URL.RequestURI()))}
 	return s.render(w, r, http.StatusOK, "feed", page)
-}
-
-func rows(events []store.Event) []EventRow {
-	out := make([]EventRow, 0, len(events))
-	for _, e := range events {
-		out = append(out, row(e))
-	}
-	return out
 }
 
 const nothingFollowed = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
@@ -170,7 +253,7 @@ func (s *Server) following(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		page.List = s.groupByDay(rows(events))
+		page.List = s.groupByDay(toggleRows(events, r.URL.RequestURI()))
 	}
 	return s.render(w, r, http.StatusOK, "feed", page)
 }
@@ -199,16 +282,8 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	upcoming, past := s.splitPast(interested)
-	var up []EventRow
-	for _, e := range upcoming {
-		rw := row(e)
-		rw.Interest = &InterestView{Action: "/e/" + e.Slug + "/interest", Back: "/mine", State: store.Interested,
-			Count: e.Interested, Compact: true}
-		up = append(up, rw)
-	}
-	page := minePage{Base: s.base(r), Upcoming: s.groupByDay(up), Past: rows(past), Hidden: rows(hidden),
-		Empty: len(interested) == 0 && len(hidden) == 0}
-	page.Upcoming.Sub = true
+	page := minePage{Base: s.base(r), Upcoming: s.groupByDay(toggleRows(upcoming, r.URL.RequestURI())),
+		Past: rows(past), Hidden: rows(hidden), Empty: len(interested) == 0 && len(hidden) == 0}
 	return s.render(w, r, http.StatusOK, "mine", page)
 }
 
@@ -283,7 +358,7 @@ func (s *Server) poster(w http.ResponseWriter, r *http.Request) error {
 	}
 	upcoming, past := s.splitPast(events)
 	page := posterPage{Base: s.base(r), Poster: posterRef{p.Name, p.Slug},
-		Upcoming: s.groupByDay(rows(upcoming)), Past: rows(past)}
+		Upcoming: s.groupByDay(toggleRows(upcoming, r.URL.RequestURI())), Past: rows(past)}
 	if acct == nil || acct.ID != p.ID {
 		page.Follow = &followView{Kind: "poster", Key: p.Slug, Back: r.URL.Path, Label: p.Name}
 		if acct != nil {

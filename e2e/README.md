@@ -21,9 +21,18 @@ DSIDE_E2E_BIN=/path/to/dside-events go test ./e2e/... -count=1   # skip the buil
 Tests run sequentially against one shared server. The CLI tests start their
 own server so rotating keys never touches the two shared posters. Server
 stdout/stderr is attached to the test log when a test fails. Every title,
-venue and poster slug is unique per test, and feed assertions are "contains my
+venue and poster slug is unique per test, and list assertions are "contains my
 title / lacks my other title", never exact counts, so tests do not interfere
 with each other.
+
+Because the shared server accumulates events, "the list shows my event" is
+asserted on `/upcoming` (all upcoming events), `/upcoming?tag=x` or
+`/following` through `assertListed(t, c, path, title)` /
+`assertNotListed`, never on `/`: the home page shows only the next ten, so a
+title created by a test may legitimately be beyond the tenth. Home-page tests
+(`home_test.go`) instead post events about a thousand days out, so they are
+last by date whatever else exists, and check row counts inside the
+`<section class="upcoming">` column.
 
 ## How the harness talks to the binary
 
@@ -52,10 +61,11 @@ Both CLI commands work while the server runs (WAL + busy_timeout). Keys are
 
 | Method | Path | Who | Result |
 |---|---|---|---|
-| GET | `/`, `/?tag={tag}` | anyone | upcoming feed (from Athens midnight today) grouped by day; filters always include `following`; unknown tag → 404; with a session hides `not_interested` |
-| GET | `/following` | anyone | 200; feed narrowed to followed tags OR posters; no session / nothing followed → "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page." |
+| GET | `/`, `/?tag={tag}` | anyone | home: `<body class="wide">`, filters row (always includes `following`; unknown tag → 404), then `<div class="columns">` with `<section class="mine">` (only with a session AND ≥1 upcoming interested event: `<h2>Mine</h2>`, at most 10 soonest, `<a href="/mine">All of mine →</a>`) before `<section class="upcoming">` (`<h2>Upcoming</h2>`, the next 10 upcoming from Athens midnight today, `not_interested` hidden, `<a href="/upcoming{?tag=…}">All upcoming events →</a>`); the 10 is hardcoded, no paging |
+| GET | `/upcoming`, `/upcoming?tag={tag}` | anyone | 200, h1 "Upcoming", `<title>Upcoming · dside events</title>`; ALL upcoming events grouped by day, one column, same filters row; unknown tag → 404; with a session hides `not_interested` |
+| GET | `/following` | anyone | 200; all upcoming narrowed to followed tags OR posters; no session / nothing followed → "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page." |
 | GET | `/mine` | anyone | 200; Upcoming (asc), Past (desc), Hidden (with clear); no session / nothing marked → h1 "Mine" + "Nothing here yet. Press Interested on an event and it shows up here." |
-| GET | `/e/{slug}` | anyone | event page, identical for anon and user: Interested / Not interested buttons + counter; owner: Edit link + Delete form; past: "This event has passed.", no buttons; no login link |
+| GET | `/e/{slug}` | anyone | event page, identical for anon and user: Interested / Not interested buttons + counter, the pressed one reads `✓ Interested` / `✓ Not interested` with `aria-pressed="true"`; owner: Edit link + Delete form; past: "This event has passed.", no buttons; no login link |
 | POST | `/e/{slug}/interest` | anyone | no session → creates `Account{role user}` + session, sets cookie, then acts; `state=interested\|not_interested\|clear`, `back`; 303 → `back` (local path only) else `/e/{slug}`; bad state → 400; unknown slug → 404 |
 | GET | `/p/{slug}` | anyone | poster name, follow toggle (everyone), Upcoming then Past lists; not a poster → 404 |
 | POST | `/follow` | anyone | lazy account as above; `kind=tag\|poster`, `key`, `on=1\|0`, `back`; 303; unknown key → 404 (no account created); idempotent |
@@ -76,6 +86,19 @@ Both CLI commands work while the server runs (WAL + busy_timeout). Keys are
 
 Nav is always `mine · account` (+ `new` for posters); no page links to a
 login. Read pages never redirect and never set a cookie.
+
+List rows (`/` both columns, `/upcoming`, `/following`, `/mine` Upcoming,
+`/p/{slug}` Upcoming) are `<li>` inside `<ul class="events">`:
+`<time>`, `<a href="/e/{slug}">`, and one toggle form
+`<form method="post" action="/e/{slug}/interest" …>` with hidden
+`name="back"` (the current path incl. query) and a single
+`<button name="state" value="interested|clear" aria-pressed="false|true">`
+reading `Interested` or `✓ Interested`. Rows never offer `not_interested`.
+Past rows (`/mine` Past, `/p/{slug}` Past, `<ul class="past">`) carry no
+form. Day headings are `<h3 class="day">{Today · |Tomorrow · }<b>Weekday</b>
+2 January</h3>` everywhere. Helpers: `eventRows`, `rowsFor`/`rowFor`,
+`slugOf`, `section` (client_test.go) and `assertRowToggle`
+(interest_test.go).
 
 Event form fields: `title`, `date`, `time`, `venue`, `price`, `tag` (repeated),
 `link_label_1..5`, `link_url_1..5`, `description`. There is no sixth link
@@ -101,7 +124,10 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 ```
 
 The weed phase greps these against `^rule|^surface|^invariant` in the spec to
-find uncovered obligations.
+find uncovered obligations. Home-page assertions cite `Home` (and its
+guarantees as `Home.TenAtMost`, `Home.SideBySide`, the config as
+`home_list_size`); `/upcoming` and `/following` assertions cite
+`UpcomingAll`, which replaced the former `Feed` surface.
 
 ## Not black-box testable
 
@@ -119,12 +145,13 @@ find uncovered obligations.
 |---|---|
 | `main_test.go` | `TestMain`: build, temp dir, shared server, seed posters via `add-poster` (server first, then CLI with `BASE_URL`), teardown |
 | `harness_test.go` | `server`, `startServer`, `launchServer`, `waitHealthy`, `runCLI`, `addPoster`/`addPosterRaw`, `posterLink`, `parseLink` |
-| `client_test.go` | `client` (cookie jar, no redirects), `get`/`postForm`/`follow`/`cookie`/`setRawCookie`, `sessionSetCookie`, assertions incl. `assertCopy` and `assertSessionCookieFlags`, HTML helpers |
+| `client_test.go` | `client` (cookie jar, no redirects), `get`/`postForm`/`follow`/`cookie`/`setRawCookie`, `sessionSetCookie`, assertions incl. `assertCopy`, `assertSessionCookieFlags`, `assertListed`/`assertNotListed`, HTML helpers incl. `eventRows`/`rowsFor`/`rowFor`/`slugOf`/`section` |
 | `fixtures_test.go` | `uid`/`uniqTitle`/`uniqSlug`, `asPoster`/`newUser`/`openLink`/`secretLink`/`keyPath`/`randomKey`, `eventForm`/`validEvent`/`createEvent`, `tomorrow`/`yesterday`, `interestedCount`, `setInterest`, `follow` |
-| `browse_test.go` | public feed, tag + following filters, event and poster pages, anonymous event page with buttons, 403/200 route table |
+| `browse_test.go` | `/upcoming` list, tag filters on `/upcoming` and `/`, event and poster pages, anonymous event page with buttons, 403/200 route table |
+| `home_test.go` | home page: Upcoming column of at most ten with the "All upcoming events →" link (also filtered), the eleventh-plus on `/upcoming` only, Mine column present/absent, `<body class="wide">` only on `/`, `/upcoming` h1/title/tag filter/404, `<h3 class="day">` headings with bold weekday |
 | `secret_test.go` | lazy account creation, cookie flags, no-session read pages, account page with link and forms, open / unknown / switch link, rotate, forget, session-less POSTs, login routes gone, poster link login, `poster-link` CLI |
 | `account_test.go` | follows on the account page, poster variant, self-deletion (data, sessions, link), confirm, poster 403 |
 | `events_test.go` | create/edit/delete, validation, duplicates, slugs, owner checks, `add-poster` CLI (link, no-op for existing slug, unique slugs/keys) |
 | `follow_test.go` | tag/poster follow toggles, anon follow from a poster page, `/following` semantics incl. anon 200 |
-| `interest_test.go` | interested / not_interested / clear, counters, `/mine`, anon mark starts an account |
+| `interest_test.go` | interested / not_interested / clear, counters, `/mine`, anon mark starts an account, row toggles on every list (`assertRowToggle`), past rows without a toggle, ✓ on the event page's pressed button |
 | `pwa_test.go` | manifest, service worker, static assets, 404/405, no-JS guarantees (every mutation 303, forms well-formed, `/k/` is the one state-changing GET) |

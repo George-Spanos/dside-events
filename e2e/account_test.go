@@ -13,7 +13,7 @@ func TestAccount_ShowsFollowsAndTagToggles(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertContains(t, r, "<h2>Following</h2>")
 	// Every tag can be followed from here.
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition"} {
 		assertForm(t, r, `action="/follow"`, `value="tag"`, `value="`+tag+`"`, `value="1"`)
 	}
 	assertNotContains(t, r, `href="/p/`+poster2.Slug+`"`)
@@ -57,7 +57,7 @@ func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	c := newUser(t)
 	old := c.cookie("session")
 	assertRedirect(t, setInterest(c, slug, "interested", page), page)
-	assertRedirect(t, follow(c, "tag", "party", "1", "/account"), "/account")
+	assertRedirect(t, follow(c, "tag", "theater", "1", "/account"), "/account")
 	assertRedirect(t, follow(c, "poster", poster1.Slug, "1", "/account"), "/account")
 	link, _ := secretLink(t, c)
 	other := openLink(t, shared, link) // the same account on a second device
@@ -103,7 +103,7 @@ func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 		t.Errorf("new account after deletion got the deleted link back")
 	}
 	r = c.get("/account")
-	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="party"`, `value="0"`)
+	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="theater"`, `value="0"`)
 	assertNotContains(t, r, `href="/p/`+poster1.Slug+`"`)
 	assertNotContains(t, c.get(page), "Hidden from your feed")
 	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {

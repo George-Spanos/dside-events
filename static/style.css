@@ -43,6 +43,7 @@ h2 {
   border-bottom: 1px solid var(--rule);
 }
 h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+body.wide { max-width: 110ch; }
 a { color: var(--link); text-decoration: underline; text-underline-offset: .15em; }
 [aria-current] { font-weight: bold; text-decoration: none; }
 [aria-current] a { color: inherit; text-decoration: none; }
@@ -71,10 +72,25 @@ footer { margin-top: 3rem; }
 .events, .links, .past, .curators { list-style: none; padding: 0; }
 .past li, .curators li { margin-bottom: .5rem; }
 
-/* Programme column: time | title + details */
-.events li { display: grid; grid-template-columns: 6ch 1fr; margin-bottom: .75rem; }
+/* Home: Mine and Upcoming side by side when there is room, stacked otherwise */
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr)); gap: 0 3rem; }
+
+/* Day headings: weekday bold, a rule under each day */
+.day {
+  font-size: 1rem;
+  font-weight: normal;
+  margin: 2rem 0 .5rem;
+  padding-bottom: .25rem;
+  border-bottom: 1px solid var(--rule);
+}
+.day b { font-weight: bold; }
+h2 + .day { margin-top: 1rem; }
+
+/* Programme row: time | title + details | Interested toggle */
+.events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 1rem; }
+.meta span { display: block; }
 .events time { font-variant-numeric: tabular-nums; }
-.events form { margin: .25rem 0 0; }
+.row-toggle { margin: 0; }
 
 /* Event page */
 .desc p { white-space: pre-line; }
@@ -100,7 +116,7 @@ legend { padding: 0; margin-bottom: .25rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0 1rem; }
 .row > div { flex: 1 1 8rem; }
 
-/* Buttons and toggles: pressed = fg/bg swapped, label never changes */
+/* Buttons and toggles: pressed = fg/bg swapped, bold, label gets a check mark */
 button {
   display: inline-block;
   min-height: 2rem;
@@ -111,8 +127,9 @@ button {
   color: var(--fg);
   cursor: pointer;
 }
-button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: bold; }
 form.inline { display: inline; }
+.row-toggle button, .interest button { white-space: nowrap; }
 .interest button { margin: 0 .5rem .5rem 0; }
 .tagfollows { margin-bottom: 1rem; }
 .tagfollows button { margin: 0 .5rem .5rem 0; }

@@ -41,7 +41,8 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	h := s.handle
 
-	mux.HandleFunc("GET /{$}", h(s.feed))
+	mux.HandleFunc("GET /{$}", h(s.home))
+	mux.HandleFunc("GET /upcoming", h(s.upcoming))
 	mux.HandleFunc("GET /following", h(s.following))
 	mux.HandleFunc("GET /mine", h(s.mine))
 	mux.HandleFunc("GET /e/{slug}", h(s.event))

@@ -4,45 +4,49 @@ import (
 	"testing"
 )
 
-// spec: FollowTag, UnfollowTag, TagFollow, AccountPage, Feed
+// spec: FollowTag, UnfollowTag, TagFollow, AccountPage, Home, UpcomingAll
 func TestFollowTag_FollowUnfollow_Idempotent(t *testing.T) {
 	c := newUser(t)
-	on := []string{`action="/follow"`, `value="tag"`, `value="dance"`, `value="0"`}
-	off := []string{`action="/follow"`, `value="tag"`, `value="dance"`, `value="1"`}
+	on := []string{`action="/follow"`, `value="tag"`, `value="theater"`, `value="0"`}
+	off := []string{`action="/follow"`, `value="tag"`, `value="theater"`, `value="1"`}
 
 	r := c.get("/account")
 	assertStatus(t, r, 200)
 	assertForm(t, r, off...)
 	assertNoForm(t, r, on...)
 
-	assertRedirect(t, follow(c, "tag", "dance", "1", "/account"), "/account")
+	assertRedirect(t, follow(c, "tag", "theater", "1", "/account"), "/account")
 	r = c.get("/account")
 	assertForm(t, r, on...)
 	assertNoForm(t, r, off...)
 
 	// Following twice is a no-op.
-	assertRedirect(t, follow(c, "tag", "dance", "1", "/account"), "/account")
+	assertRedirect(t, follow(c, "tag", "theater", "1", "/account"), "/account")
 	r = c.get("/account")
 	assertForm(t, r, on...)
 	assertNoForm(t, r, off...)
 
-	// The tag filter shows the toggle for the active tag.
-	r = c.get("/?tag=dance")
+	// The tag filter shows the toggle for the active tag, on the home page
+	// and on the full list alike.
+	r = c.get("/?tag=theater")
+	assertStatus(t, r, 200)
+	assertForm(t, r, on...)
+	r = c.get("/upcoming?tag=theater")
 	assertStatus(t, r, 200)
 	assertForm(t, r, on...)
 
-	assertRedirect(t, follow(c, "tag", "dance", "0", "/account"), "/account")
+	assertRedirect(t, follow(c, "tag", "theater", "0", "/account"), "/account")
 	r = c.get("/account")
 	assertForm(t, r, off...)
 	assertNoForm(t, r, on...)
 
 	// Unfollowing twice is a no-op too.
-	assertRedirect(t, follow(c, "tag", "dance", "0", "/account"), "/account")
+	assertRedirect(t, follow(c, "tag", "theater", "0", "/account"), "/account")
 	assertForm(t, c.get("/account"), off...)
 
 	// back that is not a local path lands on /.
-	assertRedirect(t, follow(c, "tag", "dance", "1", "https://evil.example/"), "/")
-	assertRedirect(t, follow(c, "tag", "dance", "0", ""), "/")
+	assertRedirect(t, follow(c, "tag", "theater", "1", "https://evil.example/"), "/")
+	assertRedirect(t, follow(c, "tag", "theater", "0", ""), "/")
 }
 
 // spec: FollowPoster, UnfollowPoster, PosterFollow, PosterPage, AccountPage
@@ -117,28 +121,28 @@ func TestFollow_UnknownTargets404(t *testing.T) {
 	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="concert"`, `value="0"`)
 }
 
-// spec: Feed, TagFollow, PosterFollow
-func TestFeed_FollowingFilter(t *testing.T) {
+// spec: UpcomingAll, TagFollow, PosterFollow
+func TestFollowing_UnionOfTagAndPoster(t *testing.T) {
 	p1, p2 := asPoster(t, poster1), asPoster(t, poster2)
 	byTag := validEvent(t, tomorrow())
 	byTag.Title = uniqTitle(t, "Dance Night")
-	byTag.Tags = []string{"dance"}
+	byTag.Tags = []string{"theater"}
 	byPoster := validEvent(t, tomorrow())
 	byPoster.Title = uniqTitle(t, "Nikos Workshop")
-	byPoster.Tags = []string{"workshop"}
+	byPoster.Tags = []string{"exhibition"}
 	neither := validEvent(t, tomorrow())
 	neither.Title = uniqTitle(t, "Some Talk")
-	neither.Tags = []string{"talk"}
+	neither.Tags = []string{"film"}
 	pastDance := validEvent(t, yesterday())
 	pastDance.Title = uniqTitle(t, "Old Dance")
-	pastDance.Tags = []string{"dance"}
+	pastDance.Tags = []string{"theater"}
 	createEvent(t, p1, byTag)
 	createEvent(t, p2, byPoster)
 	createEvent(t, p1, neither)
 	createEvent(t, p1, pastDance)
 
 	c := newUser(t)
-	assertRedirect(t, follow(c, "tag", "dance", "1", "/following"), "/following")
+	assertRedirect(t, follow(c, "tag", "theater", "1", "/following"), "/following")
 	assertRedirect(t, follow(c, "poster", poster2.Slug, "1", "/following"), "/following")
 
 	r := c.get("/following")
@@ -148,21 +152,21 @@ func TestFeed_FollowingFilter(t *testing.T) {
 	assertNotContains(t, r, neither.Title)
 	assertNotContains(t, r, pastDance.Title)
 
-	// The plain feed is unfiltered.
-	r = c.get("/")
+	// The full list is unfiltered.
+	r = c.get("/upcoming")
 	assertContains(t, r, byTag.Title)
 	assertContains(t, r, byPoster.Title)
 	assertContains(t, r, neither.Title)
 
 	// Unfollowing the tag removes only the tag-matched event.
-	assertRedirect(t, follow(c, "tag", "dance", "0", "/following"), "/following")
+	assertRedirect(t, follow(c, "tag", "theater", "0", "/following"), "/following")
 	r = c.get("/following")
 	assertNotContains(t, r, byTag.Title)
 	assertContains(t, r, byPoster.Title)
 }
 
-// spec: Feed
-func TestFeed_FollowingFilter_EmptyState(t *testing.T) {
+// spec: UpcomingAll
+func TestFollowing_EmptyState(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	createEvent(t, asPoster(t, poster1), f)
 	c := newUser(t)
@@ -173,8 +177,8 @@ func TestFeed_FollowingFilter_EmptyState(t *testing.T) {
 	assertContains(t, r, `href="/`)
 }
 
-// spec: Feed, Visitor
-func TestFeed_FollowingFilter_Anon200Empty(t *testing.T) {
+// spec: UpcomingAll, Home, Visitor
+func TestFollowing_Anon200Empty(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	createEvent(t, asPoster(t, poster1), f)
 	v := anon(t)
@@ -186,8 +190,8 @@ func TestFeed_FollowingFilter_Anon200Empty(t *testing.T) {
 	if v.cookie("session") != nil {
 		t.Errorf("GET /following set a session cookie")
 	}
-	// The filter link is offered on the feed for everyone.
-	for _, path := range []string{"/", "/?tag=concert", "/following"} {
+	// The filter link is offered on every list page for everyone.
+	for _, path := range []string{"/", "/?tag=concert", "/upcoming", "/upcoming?tag=concert", "/following"} {
 		assertContains(t, v.get(path), `href="/following"`)
 	}
 }

@@ -371,3 +371,83 @@ func formTags(body string) []string {
 func containsFold(body, want string) bool {
 	return strings.Contains(strings.ToLower(body), strings.ToLower(want))
 }
+
+// ---- lists and rows ---------------------------------------------------------
+
+// assertListed wants the event titled title on the list page at path: an
+// upcoming list such as /upcoming, /upcoming?tag=x or /following. "/" is not
+// a list page for this purpose: it shows only the next ten events and the
+// shared server accumulates events across tests, so a title created here
+// may legitimately be beyond the tenth.
+func assertListed(t testing.TB, c *client, path, title string) {
+	t.Helper()
+	r := c.get(path)
+	assertStatus(t, r, 200)
+	if !strings.Contains(r.Body, title) {
+		t.Errorf("%s does not list %q\nbody: %s", path, title, snippet(r.Body))
+	}
+}
+
+// assertNotListed is the negation of assertListed.
+func assertNotListed(t testing.TB, c *client, path, title string) {
+	t.Helper()
+	r := c.get(path)
+	assertStatus(t, r, 200)
+	if strings.Contains(r.Body, title) {
+		t.Errorf("%s lists %q, must not\nbody: %s", path, title, snippet(r.Body))
+	}
+}
+
+var (
+	listItem   = regexp.MustCompile(`(?s)<li\b[^>]*>.*?</li>`)
+	eventsList = regexp.MustCompile(`(?s)<ul class="events">.*?</ul>`)
+	rowSlug    = regexp.MustCompile(`href="/e/([a-z0-9-]+)"`)
+	sectionTag = regexp.MustCompile(`(?s)<section class="(mine|upcoming)">.*?</section>`)
+)
+
+// eventRows returns every <li>…</li> inside a <ul class="events"> list: the
+// upcoming rows of a page, never the past ones (<ul class="past">).
+func eventRows(body string) []string {
+	var out []string
+	for _, ul := range eventsList.FindAllString(body, -1) {
+		out = append(out, listItem.FindAllString(ul, -1)...)
+	}
+	return out
+}
+
+// rowsFor returns every <li> in body (any list) linking to /e/slug.
+func rowsFor(body, slug string) []string {
+	var out []string
+	for _, li := range listItem.FindAllString(body, -1) {
+		if strings.Contains(li, `href="/e/`+slug+`"`) {
+			out = append(out, li)
+		}
+	}
+	return out
+}
+
+// rowFor returns the first <li> in body linking to /e/slug, or "".
+func rowFor(body, slug string) string {
+	if rs := rowsFor(body, slug); len(rs) > 0 {
+		return rs[0]
+	}
+	return ""
+}
+
+// slugOf returns the event slug a row links to, or "".
+func slugOf(row string) string {
+	if m := rowSlug.FindStringSubmatch(row); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// section returns the home page's <section class="name">…</section>, or "".
+func section(body, name string) string {
+	for _, s := range sectionTag.FindAllString(body, -1) {
+		if strings.HasPrefix(s, `<section class="`+name+`">`) {
+			return s
+		}
+	}
+	return ""
+}

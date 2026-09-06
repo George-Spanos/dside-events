@@ -1,15 +1,23 @@
 {{define "daylist"}}
 {{range .Days}}
-{{if $.Sub}}<h3>{{if .Label}}{{.Label}} · {{end}}{{day .Date}}</h3>{{else}}<h2>{{if .Label}}{{.Label}} · {{end}}{{day .Date}}</h2>{{end}}
+<h3 class="day"><b>{{if .Label}}{{.Label}} · {{end}}{{weekday .Date}}</b> {{date .Date}}</h3>
 <ul class="events">
   {{range .Events}}
   <li>
     <time datetime="{{iso .Start}}">{{clock .Start}}</time>
     <div>
-      <a href="/e/{{.Slug}}">{{.Title}}</a><br>
-      <small>{{.Venue}}{{with .Price}} · {{.}}{{end}}{{if .Interested}} · {{.Interested}} interested{{end}}</small>
-      {{with .Interest}}{{template "interest" .}}{{end}}
+      <a href="/e/{{.Slug}}">{{.Title}}</a>
+      <small class="meta">
+        <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
+        <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
+        <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
+        <span>{{.Interested}} interested</span>
+      </small>
     </div>
+    {{if .Back}}<form method="post" action="/e/{{.Slug}}/interest" data-toggle class="row-toggle">
+      <input type="hidden" name="back" value="{{.Back}}">
+      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}">{{if .Marked}}✓ {{end}}Interested</button>
+    </form>{{end}}
   </li>
   {{end}}
 </ul>

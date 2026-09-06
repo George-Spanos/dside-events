@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// spec: Feed, Event.is_upcoming, Visitor
-func TestFeed_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
+// spec: UpcomingAll, Event.is_upcoming, Visitor
+func TestUpcoming_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
 	p := asPoster(t, poster1)
 	a := validEvent(t, tomorrow())
 	a.Title = uniqTitle(t, "Feed A")
@@ -19,7 +19,7 @@ func TestFeed_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
 	createEvent(t, p, c)
 	createEvent(t, p, a)
 
-	r := anon(t).get("/")
+	r := anon(t).get("/upcoming")
 	assertStatus(t, r, 200)
 	assertContains(t, r, a.Title)
 	assertContains(t, r, b.Title)
@@ -27,19 +27,19 @@ func TestFeed_AnonSeesUpcomingOnly_SortedAscending(t *testing.T) {
 	assertBefore(t, r, a.Title, b.Title)
 }
 
-// spec: Feed, EventDetail
-func TestFeed_EventLinksToDetail(t *testing.T) {
+// spec: UpcomingAll, EventDetail
+func TestUpcoming_EventLinksToDetail(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, p, f)
 
-	r := anon(t).get("/")
+	r := anon(t).get("/upcoming")
 	assertStatus(t, r, 200)
 	assertContains(t, r, `href="/e/`+slug+`"`)
 }
 
-// spec: Feed
-func TestFeed_TagFilter(t *testing.T) {
+// spec: UpcomingAll, Home
+func TestUpcoming_TagFilter(t *testing.T) {
 	p := asPoster(t, poster1)
 	th := validEvent(t, tomorrow())
 	th.Title = uniqTitle(t, "Play")
@@ -51,19 +51,24 @@ func TestFeed_TagFilter(t *testing.T) {
 	createEvent(t, p, co)
 
 	v := anon(t)
-	r := v.get("/?tag=theater")
+	r := v.get("/upcoming?tag=theater")
 	assertStatus(t, r, 200)
 	assertContains(t, r, th.Title)
 	assertNotContains(t, r, co.Title)
 
-	r = v.get("/?tag=concert")
+	r = v.get("/upcoming?tag=concert")
 	assertStatus(t, r, 200)
 	assertContains(t, r, co.Title)
 	assertNotContains(t, r, th.Title)
 
+	// The home page filters the same way (only the next ten, so no
+	// "contains my title" here) and offers every tag.
+	assertStatus(t, v.get("/?tag=theater"), 200)
+	assertNotContains(t, v.get("/?tag=theater"), co.Title)
+	assertNotContains(t, v.get("/?tag=concert"), th.Title)
 	r = v.get("/")
 	assertStatus(t, r, 200)
-	for _, tag := range []string{"concert", "theater", "film", "exhibition", "talk", "party", "dance", "workshop"} {
+	for _, tag := range []string{"concert", "theater", "film", "exhibition"} {
 		assertContains(t, r, `href="/?tag=`+tag+`"`)
 	}
 	// The following filter is always offered, session or not.
@@ -71,13 +76,14 @@ func TestFeed_TagFilter(t *testing.T) {
 
 	r = v.get("/?tag=bogus")
 	assertStatus(t, r, 404)
+	assertStatus(t, v.get("/upcoming?tag=bogus"), 404)
 }
 
 // spec: EventDetail
 func TestEventDetail_ShowsAllPublicFields(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
-	f.Tags = []string{"concert", "talk"}
+	f.Tags = []string{"concert", "film"}
 	f.Price = "12 EUR"
 	f.Venue = "Technopolis"
 	f.Description = "An evening of improvised sound. Arrive early."
@@ -93,7 +99,7 @@ func TestEventDetail_ShowsAllPublicFields(t *testing.T) {
 	assertContains(t, r, f.Description)
 	assertContains(t, r, f.Time)
 	assertContains(t, r, `href="/?tag=concert"`)
-	assertContains(t, r, `href="/?tag=talk"`)
+	assertContains(t, r, `href="/?tag=film"`)
 	assertContains(t, r, `href="`+f.LinkURLs[0]+`"`)
 	assertContains(t, r, `href="`+f.LinkURLs[1]+`"`)
 	assertContains(t, r, "Listen")
@@ -112,18 +118,17 @@ func TestEventDetail_Unknown404(t *testing.T) {
 	assertContains(t, r, "Page not found")
 }
 
-// spec: EventDetail, Feed, Event.is_upcoming
+// spec: EventDetail, UpcomingAll, Home, Event.is_upcoming
 func TestEventDetail_PastEventStillReachable(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, yesterday())
 	slug := createEvent(t, p, f)
 
 	v := anon(t)
-	r := v.get("/")
-	assertStatus(t, r, 200)
-	assertNotContains(t, r, f.Title)
+	assertNotListed(t, v, "/upcoming", f.Title)
+	assertNotListed(t, v, "/", f.Title)
 
-	r = v.get("/e/" + slug)
+	r := v.get("/e/" + slug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	assertContains(t, r, "This event has passed.")
@@ -200,14 +205,14 @@ func TestAnon_EventPageOffersInterest_NoOwnerControls(t *testing.T) {
 	}
 }
 
-// spec: Feed, MyEvents, AccountPage, EventComposer, EventEditor, DeleteEvent, Poster, Visitor
+// spec: UpcomingAll, MyEvents, AccountPage, EventComposer, EventEditor, DeleteEvent, Poster, Visitor
 func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	v := anon(t)
 
 	// Read pages: 200, no redirect, no cookie.
-	for _, path := range []string{"/mine", "/following", "/account"} {
+	for _, path := range []string{"/mine", "/following", "/upcoming", "/account"} {
 		r := v.get(path)
 		assertStatus(t, r, 200)
 		if v.cookie("session") != nil || sessionSetCookie(r) != "" {
@@ -246,5 +251,5 @@ func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	assertContains(t, r, "Nobody yet interested")
-	assertNotContains(t, anon(t).get("/"), hijack.Title)
+	assertNotListed(t, anon(t), "/upcoming", hijack.Title)
 }

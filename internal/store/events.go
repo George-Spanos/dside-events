@@ -115,6 +115,7 @@ type FeedOpts struct {
 	Tag           string    // optional tag filter
 	ViewerID      int64     // 0 for anonymous; hides the viewer's not_interested events
 	FollowingOnly bool      // only events from followed tags or followed posters
+	Limit         int       // at most this many rows; 0 means all
 }
 
 // Feed lists upcoming events in chronological order.
@@ -131,7 +132,11 @@ func (s *Store) Feed(ctx context.Context, o FeedOpts) ([]Event, error) {
     OR EXISTS (SELECT 1 FROM follows_posters fp WHERE fp.account_id = ? AND fp.poster_id = e.poster_id))`
 		args = append(args, o.ViewerID, o.ViewerID)
 	}
-	where += " ORDER BY e.starts_at ASC, e.id ASC LIMIT 500"
+	where += " ORDER BY e.starts_at ASC, e.id ASC"
+	if o.Limit > 0 {
+		where += " LIMIT ?"
+		args = append(args, o.Limit)
+	}
 	return s.queryEvents(ctx, where, args...)
 }
 

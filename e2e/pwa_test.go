@@ -70,6 +70,7 @@ func TestPages_DeclareManifestViewportAndSW(t *testing.T) {
 		r    resp
 	}{
 		{"/", anon(t).get("/")},
+		{"/upcoming", anon(t).get("/upcoming")},
 		{"/following", anon(t).get("/following")},
 		{"/e/{slug}", anon(t).get("/e/" + slug)},
 		{"/p/{slug}", anon(t).get("/p/" + poster1.Slug)},
@@ -224,13 +225,14 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 	}
 }
 
-// spec: PwaAssets, EventDetail, EventComposer, EventEditor, AccountPage, MyEvents, PosterPage, Feed, SecretLink
+// spec: PwaAssets, EventDetail, EventComposer, EventEditor, AccountPage, MyEvents, PosterPage, Home, UpcomingAll, SecretLink
 func TestNoJS_FormsAreWellFormed(t *testing.T) {
 	p := asPoster(t, poster1)
 	slug := createEvent(t, p, validEvent(t, tomorrow()))
 	hidden := createEvent(t, p, validEvent(t, tomorrow()))
 	u := newUser(t)
 	assertRedirect(t, setInterest(u, hidden, "not_interested", "/mine"), "/mine")
+	assertRedirect(t, follow(u, "poster", poster1.Slug, "1", "/following"), "/following")
 
 	pages := []struct {
 		name string
@@ -247,7 +249,10 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 		{"/mine", u.get("/mine")},
 		{"/p/{slug} (anon)", anon(t).get("/p/" + poster1.Slug)},
 		{"/p/{slug} (user)", u.get("/p/" + poster1.Slug)},
+		{"/ (anon)", anon(t).get("/")},
 		{"/?tag=concert (user)", u.get("/?tag=concert")},
+		{"/upcoming (user)", u.get("/upcoming")},
+		{"/following (user)", u.get("/following")},
 	}
 	for _, pg := range pages {
 		assertStatus(t, pg.r, 200)

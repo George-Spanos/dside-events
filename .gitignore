@@ -5,3 +5,6 @@ bin/
 *.db-shm
 /events
 /dside-events
+
+# secret curator links written by make prod-curators / poster-link — never commit
+curators.txt
