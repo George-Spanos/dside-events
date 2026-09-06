@@ -21,7 +21,6 @@ type Base struct {
 	Account *AccountView
 	Path    string
 	Version string
-	Wide    bool   // / only: two columns need a wider body
 	Theme   string // "light" or "dark" when the visitor chose one; "" follows the system
 }
 

@@ -203,7 +203,6 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	page := homePage{Base: s.base(r), Filters: s.filters("/", tag), TagFollow: follow, Empty: empty, AllHref: "/upcoming"}
-	page.Wide = true
 	if tag != "" {
 		page.AllHref = "/upcoming?tag=" + url.QueryEscape(tag)
 	}

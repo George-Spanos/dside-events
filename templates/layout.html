@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#272320" media="(prefers-color-scheme: dark)">
 <script src="/static/app.js?v={{.Version}}" defer></script>
 </head>
-<body{{if .Wide}} class="wide"{{end}}>
+<body>
 <header>
   {{if or (eq .Path "/") (eq .Path "/following")}}<h1>dside events</h1>{{else}}<p class="brand"><a href="/">dside events</a></p>{{end}}
   <nav aria-label="Account">

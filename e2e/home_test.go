@@ -231,28 +231,6 @@ func TestHome_MineColumn_AbsentWhenOnlyPastFollowed(t *testing.T) {
 	assertContains(t, r, headingUpcoming)
 }
 
-// spec: Home, Home.SideBySide, UpcomingAll, MyEvents, EventDetail, PosterPage, AccountPage
-func TestHome_WideBodyOnlyOnHome(t *testing.T) {
-	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
-	u := newUser(t)
-	assertRedirect(t, setEventFollow(u, slug, "follow", "/"), "/")
-
-	for _, path := range []string{"/", "/?tag=concert"} {
-		r := u.get(path)
-		assertStatus(t, r, 200)
-		assertContains(t, r, `<body class="wide">`)
-	}
-	assertContains(t, anon(t).get("/"), `<body class="wide">`)
-
-	for _, path := range []string{"/upcoming", "/upcoming?tag=concert", "/following", "/mine", "/account", "/e/" + slug, "/p/" + poster1.Slug} {
-		r := u.get(path)
-		assertStatus(t, r, 200)
-		if strings.Contains(r.Body, `class="wide"`) {
-			t.Errorf("%s has a wide body; only / is wide", path)
-		}
-	}
-}
-
 // spec: UpcomingAll, Visitor
 func TestUpcoming_Page_TagFilter_Unknown404(t *testing.T) {
 	p := asPoster(t, poster1)
