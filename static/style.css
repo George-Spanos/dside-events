@@ -129,6 +129,10 @@ fieldset { border: 0; padding: 0; min-width: 0; }
 legend { padding: 0; margin-bottom: .25rem; }
 .check { display: inline-block; margin: 0 1rem .5rem 0; }
 .check input { width: 1.125rem; height: 1.125rem; margin: 0 .375rem 0 0; vertical-align: -.15em; }
+/* The weekday, times and until fields only mean something for a repeating
+   event, so they wait until Repeats is ticked. No script: the checkbox itself
+   holds the state, and a browser without :has() shows them all, as before. */
+#repeats:not(:has(input[name="repeats"]:checked)) .repeat { display: none; }
 .hint { margin: -.75rem 0 1rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0 1rem; }
 .row > div { flex: 1 1 8rem; }

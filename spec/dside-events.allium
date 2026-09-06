@@ -996,9 +996,11 @@ surface EventComposer {
     @guidance
         -- HTTP: GET /new renders the form (visible labels, hints, an error
         -- summary with anchors on 422) with the repeats controls always in
-        -- view: a Repeats checkbox, the seven weekday checkboxes, Times and
-        -- Until. POST /new is described in CreateEvent and, when repeats=1 is
-        -- sent, in CreateSeries. Anyone who is not a poster, anonymous
+        -- the markup: a Repeats checkbox, and behind it the seven weekday
+        -- checkboxes, Times and Until, which the ticked checkbox reveals in
+        -- CSS alone and a re-render after a 422 keeps in view. POST /new is
+        -- described in CreateEvent and, when repeats=1 is sent, in
+        -- CreateSeries. Anyone who is not a poster, anonymous
         -- included, gets 403.
 }
 

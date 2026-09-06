@@ -46,7 +46,8 @@ func inputWith(body string, fragments ...string) bool {
 func TestCreateSeries_RowsRedirectAndDiscriminator(t *testing.T) {
 	p := asPoster(t, poster1)
 
-	// The New event form offers the repeat controls; nothing is revealed by script.
+	// The New event form carries the repeat controls; the checkbox reveals the
+	// rest in CSS, so they are in the markup whether or not it is ticked.
 	r := p.get("/new")
 	assertStatus(t, r, 200)
 	assertForm(t, r, `action="/new"`, `name="repeats"`, `name="times"`, `name="until"`)
