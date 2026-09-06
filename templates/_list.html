@@ -16,7 +16,7 @@
     </div>
     {{if .Back}}<form method="post" action="/e/{{.Slug}}/interest" data-toggle class="row-toggle">
       <input type="hidden" name="back" value="{{.Back}}">
-      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}">Interested</button>
+      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}" data-on="Interested" data-off="I'm interested">{{if .Marked}}Interested{{else}}I'm interested{{end}}</button>
     </form>{{end}}
   </li>
   {{end}}

@@ -321,7 +321,7 @@ func TestInterested_AnonMarkStartsAccount(t *testing.T) {
 
 var (
 	pressedRowButton   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
-	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Interested\s*</button>`)
+	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*I'm interested\s*</button>`)
 )
 
 // assertRowToggle checks one list row against the row-toggle contract: a
@@ -373,7 +373,7 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 			}
 		}
 		if !unpressedRowButton.MatchString(row) {
-			fail("has no <button>Interested</button>")
+			fail("has no <button>I'm interested</button>")
 		}
 		for _, no := range []string{`value="clear"`, `aria-pressed="true"`} {
 			if strings.Contains(row, no) {
@@ -496,7 +496,7 @@ func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 var (
 	pressedInterested      = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
 	pressedNotInterested   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Not interested\s*</button>`)
-	unpressedInterested    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Interested\s*</button>`)
+	unpressedInterested    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*I'm interested\s*</button>`)
 	unpressedNotInterested = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Not interested\s*</button>`)
 )
 

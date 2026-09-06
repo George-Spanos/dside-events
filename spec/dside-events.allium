@@ -614,7 +614,7 @@ surface Home {
         -- shown even when the list is empty, under the usual empty copy. The
         -- columns sit side by side when the screen has room and stack, Mine
         -- first, when it does not. Every row carries the Interested toggle,
-        -- unmistakably pressed (a check mark drawn by the stylesheet, aria-pressed) when the account is
+        -- labelled "I'm interested" until pressed, then "Interested" with a check mark drawn by the stylesheet (aria-pressed) when the account is
         -- interested; a press without a session fires StartAccount and then
         -- MarkInterested in the same request. Days are visibly separated. The
         -- interested count is always shown, zero included (the founder fixed

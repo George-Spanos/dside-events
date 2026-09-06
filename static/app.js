@@ -19,7 +19,10 @@
 
     var wasPressed = btn.getAttribute('aria-pressed') === 'true';
     form.querySelectorAll('[aria-pressed]').forEach(function (b) {
-      b.setAttribute('aria-pressed', b === btn && !wasPressed ? 'true' : 'false');
+      var on = b === btn && !wasPressed;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      // The label names the action while unpressed and the state once pressed.
+      if (b.dataset.on && b.dataset.off) b.textContent = on ? b.dataset.on : b.dataset.off;
     });
 
     var body = new FormData(form);
