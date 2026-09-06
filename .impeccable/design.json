@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-06T00:00:00Z",
+  "title": "Design System: dside events",
+  "extensions": {
+    "colorMeta": {
+      "burnt-ochre": {
+        "role": "primary",
+        "displayName": "Burnt Ochre",
+        "canonical": "#875800",
+        "cssVar": "--link",
+        "tonalRamp": ["oklch(15% 0.10 70)", "oklch(26% 0.10 70)", "oklch(37% 0.10 70)", "oklch(48% 0.10 70)", "oklch(59% 0.10 70)", "oklch(70% 0.10 70)", "oklch(81% 0.09 70)", "oklch(92% 0.06 70)"]
+      },
+      "lamp-amber": {
+        "role": "primary",
+        "displayName": "Lamp Amber",
+        "canonical": "#E9B653",
+        "cssVar": "--link (dark theme)",
+        "tonalRamp": ["oklch(15% 0.12 80)", "oklch(26% 0.12 80)", "oklch(37% 0.12 80)", "oklch(48% 0.12 80)", "oklch(59% 0.12 80)", "oklch(70% 0.12 80)", "oklch(81% 0.12 80)", "oklch(92% 0.08 80)"]
+      },
+      "newsprint-warm-white": {
+        "role": "neutral",
+        "displayName": "Newsprint Warm White",
+        "canonical": "#FCF8EF",
+        "cssVar": "--bg",
+        "tonalRamp": ["oklch(15% 0.012 85)", "oklch(26% 0.012 85)", "oklch(37% 0.012 85)", "oklch(48% 0.012 85)", "oklch(59% 0.012 85)", "oklch(70% 0.012 85)", "oklch(81% 0.012 85)", "oklch(92% 0.012 85)"]
+      },
+      "printers-ink": {
+        "role": "neutral",
+        "displayName": "Printer's Ink",
+        "canonical": "#2E2823",
+        "cssVar": "--fg",
+        "tonalRamp": ["oklch(15% 0.012 70)", "oklch(26% 0.012 70)", "oklch(37% 0.012 70)", "oklch(48% 0.012 70)", "oklch(59% 0.012 70)", "oklch(70% 0.012 70)", "oklch(81% 0.012 70)", "oklch(92% 0.012 70)"]
+      },
+      "pencil-grey": {
+        "role": "neutral",
+        "displayName": "Pencil Grey",
+        "canonical": "#6C6157",
+        "cssVar": "--muted",
+        "tonalRamp": ["oklch(15% 0.018 65)", "oklch(26% 0.018 65)", "oklch(37% 0.018 65)", "oklch(48% 0.018 65)", "oklch(59% 0.018 65)", "oklch(70% 0.018 65)", "oklch(81% 0.018 65)", "oklch(92% 0.018 65)"]
+      },
+      "fold-line": {
+        "role": "neutral",
+        "displayName": "Fold Line",
+        "canonical": "#E2D9C9",
+        "cssVar": "--rule",
+        "tonalRamp": ["oklch(15% 0.022 80)", "oklch(26% 0.022 80)", "oklch(37% 0.022 80)", "oklch(48% 0.022 80)", "oklch(59% 0.022 80)", "oklch(70% 0.022 80)", "oklch(81% 0.022 80)", "oklch(92% 0.022 80)"]
+      },
+      "alarm-red": {
+        "role": "tertiary",
+        "displayName": "Alarm Red",
+        "canonical": "#B5261A",
+        "cssVar": "--error",
+        "tonalRamp": ["oklch(15% 0.18 30)", "oklch(26% 0.18 30)", "oklch(37% 0.18 30)", "oklch(48% 0.18 30)", "oklch(59% 0.16 30)", "oklch(70% 0.13 30)", "oklch(81% 0.09 30)", "oklch(92% 0.05 30)"]
+      },
+      "newsprint-warm-white-dark": { "role": "neutral", "displayName": "Newsprint Warm White (dark printing)", "canonical": "#272320", "cssVar": "--bg" },
+      "printers-ink-dark": { "role": "neutral", "displayName": "Printer's Ink (dark printing)", "canonical": "#F1EADF", "cssVar": "--fg" },
+      "pencil-grey-dark": { "role": "neutral", "displayName": "Pencil Grey (dark printing)", "canonical": "#B8AC9D", "cssVar": "--muted" },
+      "fold-line-dark": { "role": "neutral", "displayName": "Fold Line (dark printing)", "canonical": "#4B433B", "cssVar": "--rule" },
+      "alarm-red-dark": { "role": "tertiary", "displayName": "Alarm Red (dark printing)", "canonical": "#FF9585", "cssVar": "--error" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The page h1 — an event title, My feed, Upcoming, Account. One per page." },
+      "headline": { "displayName": "Headline", "purpose": "The masthead only: 'dside events' in the header." },
+      "title": { "displayName": "Day heading", "purpose": "A day in a programme list. Weekday and Today/Tomorrow prefix bolded to ink; the date stays Pencil Grey." },
+      "body": { "displayName": "Body", "purpose": "Event titles, descriptions, all prose. Capped at 68ch for long form." },
+      "label": { "displayName": "Section label", "purpose": "MY FEED, UPCOMING, PAST, HIDDEN. Pencil Grey over a 2px ink rule." },
+      "meta": { "displayName": "Meta", "purpose": "The stacked lines under an event title: tags, venue and price, curator, follower count. Also hints and inline help." },
+      "time": { "displayName": "Time", "purpose": "The start time in the fixed 6ch left margin. Bold and tabular so times align down the page." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(.2, 0, 0, 1)", "purpose": "The single curve. Every transition in the system uses it; there is no second easing." },
+      { "name": "t", "value": "150ms", "purpose": "Standard state change: background, border, colour, the check-mark slot opening." },
+      { "name": "t-out", "value": "120ms", "purpose": "Release. The active scale(.97) eases back over this; the press down is instantaneous (0s)." },
+      { "name": "t-view", "value": "200ms", "purpose": "Cross-document view transition. Root crossfade; header and filters hold still; the pressed event title travels to the event page h1." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Follow Toggle",
+      "kind": "button",
+      "refersTo": "button-pressed",
+      "description": "The signature control. Reserves its widest width and a zero-width check-mark slot so pressing changes colour only — never geometry.",
+      "html": "<button class=\"ds-toggle\" aria-pressed=\"false\">Follow</button> <button class=\"ds-toggle\" aria-pressed=\"true\">Following</button>",
+      "css": ".ds-toggle { display: inline-block; min-height: 2rem; min-width: 8.5em; text-align: center; padding: .3rem .85rem; border: 1px solid var(--fg, #2E2823); border-radius: 4px; background: var(--bg, #FCF8EF); color: var(--fg, #2E2823); font: inherit; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(.2,0,0,1), border-color 150ms cubic-bezier(.2,0,0,1), color 150ms cubic-bezier(.2,0,0,1), transform 120ms cubic-bezier(.2,0,0,1); } .ds-toggle::before { content: \"\\2713\" / \"\"; display: inline-block; width: 0; opacity: 0; overflow: hidden; vertical-align: bottom; transition: width 150ms cubic-bezier(.2,0,0,1), opacity 150ms cubic-bezier(.2,0,0,1); } .ds-toggle[aria-pressed=\"true\"] { background: var(--link, #875800); border-color: var(--link, #875800); color: var(--bg, #FCF8EF); font-weight: inherit; } .ds-toggle[aria-pressed=\"true\"]::before { width: 1.15em; opacity: 1; } .ds-toggle:active { transform: scale(.97); transition-duration: 0s; } .ds-toggle:focus-visible { outline: 2px solid var(--link, #875800); outline-offset: 2px; } @media (hover: hover) { .ds-toggle:hover { border-color: var(--link, #875800); color: var(--link, #875800); } .ds-toggle[aria-pressed=\"true\"]:hover { background: color-mix(in srgb, var(--link, #875800) 82%, var(--fg, #2E2823)); border-color: color-mix(in srgb, var(--link, #875800) 82%, var(--fg, #2E2823)); color: var(--bg, #FCF8EF); } }"
+    },
+    {
+      "name": "Hide Link-Button",
+      "kind": "button",
+      "refersTo": "button-linklike",
+      "description": "A real button styled as an underlined link, so a dismissive action never competes with the primary control it sits under.",
+      "html": "<button class=\"ds-linklike\">Hide</button>",
+      "css": ".ds-linklike { display: block; margin: .35rem auto 0; border: 0; padding: 0; min-height: 0; background: none; color: var(--muted, #6C6157); font: inherit; font-size: .9375rem; text-decoration: underline; text-underline-offset: .18em; cursor: pointer; transition: text-decoration-color 150ms cubic-bezier(.2,0,0,1); } .ds-linklike:focus-visible { outline: 2px solid var(--link, #875800); outline-offset: 2px; } @media (hover: hover) { .ds-linklike:hover { text-decoration-color: var(--link, #875800); transition-duration: 0s; } }"
+    },
+    {
+      "name": "Programme Row",
+      "kind": "custom",
+      "description": "The atom of the whole product: a three-track grid of time, title with stacked meta lines, and the Follow toggle. Never a card.",
+      "html": "<ul class=\"ds-events\"><li><time datetime=\"2026-09-12T21:00\">21:00</time><div><a class=\"ds-row-title\" href=\"#\">Trio Tekmirio</a><small class=\"ds-meta\"><span><a href=\"#\">jazz</a> &middot; <a href=\"#\">concert</a></span><span>Half Note, &euro;15</span><span><a href=\"#\">Kyriakos P.</a></span><span>7 following</span></small></div><div class=\"ds-row-toggle\"><button class=\"ds-toggle\" aria-pressed=\"false\">Follow</button><button class=\"ds-linklike\">Hide</button></div></li></ul>",
+      "css": ".ds-events { list-style: none; padding: 0; margin: 0; } .ds-events li { display: grid; grid-template-columns: 6ch 1fr auto; align-items: start; margin-bottom: 1rem; } .ds-events time { font-weight: bold; font-variant-numeric: tabular-nums; } .ds-row-title { color: var(--link, #875800); text-decoration: underline; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link, #875800) 55%, transparent); } .ds-meta { color: var(--muted, #6C6157); font-size: .9375rem; } .ds-meta span { display: block; } .ds-meta a { color: var(--link, #875800); } .ds-row-toggle { text-align: center; }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "description": "MY FEED / UPCOMING / PAST / HIDDEN. Small, muted, uppercase, over a heavy 2px rule — deliberately unmistakable for a day heading.",
+      "html": "<h2 class=\"ds-section-label\">Upcoming</h2>",
+      "css": ".ds-section-label { font-size: .8125rem; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; color: var(--muted, #6C6157); margin: 2rem 0 1rem; padding-bottom: .3rem; border-bottom: 2px solid var(--fg, #2E2823); }"
+    },
+    {
+      "name": "Day Heading",
+      "kind": "custom",
+      "description": "Mixed-case ink weekday over a hairline. The other half of the two-headings contrast.",
+      "html": "<h3 class=\"ds-day\"><b>Today &middot; Saturday</b> 6 September</h3>",
+      "css": ".ds-day { font-size: 1rem; font-weight: normal; color: var(--muted, #6C6157); margin: 2rem 0 .5rem; padding-bottom: .25rem; border-bottom: 1px solid var(--rule, #E2D9C9); } .ds-day b { font-weight: bold; color: var(--fg, #2E2823); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Square-cornered, full width, with its label above and its hint pulled up tight beneath.",
+      "html": "<label class=\"ds-label\" for=\"ds-price\">Price</label><input class=\"ds-input\" id=\"ds-price\" value=\"\u20ac10\"><p class=\"ds-hint\">Free, &euro;10, or &euro;8&ndash;12. Leave empty if unknown.</p>",
+      "css": ".ds-label { display: block; margin-bottom: .25rem; } .ds-input { display: block; width: 100%; padding: .375rem .5rem; margin-bottom: 1rem; border: 1px solid var(--muted, #6C6157); border-radius: 0; background: var(--bg, #FCF8EF); color: var(--fg, #2E2823); font: inherit; } .ds-input:focus-visible { outline: 2px solid var(--link, #875800); outline-offset: 2px; } .ds-hint { margin: -.75rem 0 1rem; color: var(--muted, #6C6157); font-size: .9375rem; }"
+    },
+    {
+      "name": "Text Field, invalid",
+      "kind": "input",
+      "refersTo": "input-invalid",
+      "description": "Alarm Red border with the message attached directly beneath, never floating.",
+      "html": "<label class=\"ds-label\" for=\"ds-venue\">Venue</label><input class=\"ds-input ds-input-invalid\" id=\"ds-venue\" aria-invalid=\"true\" aria-describedby=\"ds-venue-err\" value=\"\"><p class=\"ds-error\" id=\"ds-venue-err\">Where is it? Add a venue.</p>",
+      "css": ".ds-input-invalid[aria-invalid=\"true\"] { border-color: var(--error, #B5261A); } .ds-error { margin: -.75rem 0 1rem; color: var(--error, #B5261A); font-size: .9375rem; }"
+    },
+    {
+      "name": "Filters",
+      "kind": "nav",
+      "description": "Plain text links separated by middle dots. The active one goes bold and drops its underline — the system's only unlined link.",
+      "html": "<nav class=\"ds-filters\" aria-label=\"Filter events\"><strong aria-current=\"page\"><a href=\"#\">all</a></strong> &middot; <a href=\"#\">concert</a> &middot; <a href=\"#\">theater</a> &middot; <a href=\"#\">film</a> &middot; <a href=\"#\">exhibition</a></nav>",
+      "css": ".ds-filters { line-height: 1.75; margin-bottom: 1rem; color: var(--fg, #2E2823); } .ds-filters a { color: var(--link, #875800); text-decoration: underline; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link, #875800) 55%, transparent); transition: text-decoration-color 150ms cubic-bezier(.2,0,0,1); } .ds-filters [aria-current] { font-weight: bold; } .ds-filters [aria-current] a { color: inherit; text-decoration: none; } @media (hover: hover) { .ds-filters a:hover { text-decoration-color: var(--link, #875800); transition-duration: 0s; } }"
+    },
+    {
+      "name": "Masthead",
+      "kind": "nav",
+      "description": "Baseline-aligned flex row that wraps instead of collapsing into a menu. There is no mobile navigation pattern because there is no menu.",
+      "html": "<header class=\"ds-header\"><h1 class=\"ds-brand\">dside events</h1><nav aria-label=\"Account\"><a href=\"#\">account</a> &middot; <a href=\"#\">new</a> &middot; <button class=\"ds-linklike ds-theme\">dark</button></nav></header>",
+      "css": ".ds-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .25rem 1rem; padding: 1rem 0; margin-bottom: 1rem; border-bottom: 1px solid var(--rule, #E2D9C9); } .ds-brand { font-size: 1.375rem; font-weight: bold; letter-spacing: -.03em; margin: 0; color: var(--fg, #2E2823); } .ds-header nav { line-height: 1.75; } .ds-header a { color: var(--link, #875800); text-decoration: underline; text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link, #875800) 55%, transparent); } .ds-theme { display: inline; margin: 0; color: var(--link, #875800); font-size: inherit; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Printed Programme",
+    "overview": "A theatre season sheet. UPCOMING is set in small caps over a heavy rule; the days below it are mixed-case ink over a hairline. Times run bold and tabular down a six-character left margin, so the eye can drop straight through the column and find 21:00 without reading a word. The page is a document you read, not a surface you operate — and the whole thing is one 241-line stylesheet with no build step, no framework, and no breakpoints.\n\nThe mood is warm, plain and unhurried. Warm because the paper is #FCF8EF and the ink is #2E2823, never white-on-black-on-grey; plain because there is exactly one accent and one font stack; unhurried because nothing on the page competes for a decision. The system is old-internet in its restraint, but it is not nostalgia cosplay: it uses color-mix(), :has(), view transitions and aria-pressed where those do the job better, and degrades to a working HTML form everywhere they are absent.\n\nThe confirmed anti-reference is the event-app card grid. No poster thumbnails, no gradient overlays, no \"Trending near you\", no urgency badges, no follower counts dressed as social proof. An event is five lines of text and a toggle, and that is the finished form — not a placeholder waiting for art direction.",
+    "keyCharacteristics": [
+      "One accent colour, one font stack, one stylesheet, no build step",
+      "Zero breakpoints — layout responds through intrinsic sizing, not media queries",
+      "No imagery of any kind; the product forbids it and the design is built for its absence",
+      "Rules and type weight carry all hierarchy; there is not a single shadow",
+      "Full light and dark parity, system-following with an explicit override",
+      "Every interactive control works as a plain HTML form before JavaScript touches it"
+    ],
+    "rules": [
+      { "name": "The One Pigment Rule", "body": "There is a single accent and it never gains a sibling. If something needs to stand out and Burnt Ochre is already spoken for on that screen, the answer is type weight, a rule, or space — not a second hue. Tags, venues, prices and counts are all Pencil Grey precisely because nothing about them earns colour.", "section": "colors" },
+      { "name": "The Two Lights Rule", "body": "Light and dark are two printings of the same document, not a theme and its inversion. Every token has a counterpart, the accent swaps role-for-role, and no rule, spacing value or type size changes between them. If a change looks right in only one theme, it is wrong in both.", "section": "colors" },
+      { "name": "The Two Headings Rule", "body": "A section label and a day heading must never be mistaken for each other. They differ on four axes at once — case, size, colour and rule weight. This is what lets a single column read as sections containing days rather than one flat run of headings. Changing any one of the four is a system-level decision, not a tweak.", "section": "typography" },
+      { "name": "The Tabular Margin Rule", "body": "Times are bold, tabular-numeric, and pinned to a fixed 6ch column. The alignment is the feature: it is how a visitor scans an evening without reading.", "section": "typography" },
+      { "name": "The No-Breakpoint Rule", "body": "This stylesheet contains no width media queries and must not gain one. The only @media blocks permitted are prefers-color-scheme, prefers-reduced-motion and hover: hover. Responsive behaviour comes from minmax(), min(), ch units and intrinsic wrapping. If a layout needs a breakpoint, the layout is wrong for this system.", "section": "layout" },
+      { "name": "The One Width Rule", "body": "Every page is 110ch wide; only the text inside narrows. A visitor moving between the feed, an event and the account page never sees the column jump.", "section": "layout" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. A shadow may appear only as a response to state — hover, focus, an overlay — never as decoration and never at rest. No such state exists in the system today; the first one to need it must be added here before it is added to the stylesheet.", "section": "elevation" },
+      { "name": "The Squared Field Rule", "body": "Inputs are square-cornered and buttons are 4px. That two-value contrast is the entire form language — do not round a field to match a button, and do not add a third radius.", "section": "shapes" },
+      { "name": "The Working Form Rule", "body": "Every interactive control in this system is a real HTML form that works with JavaScript disabled. app.js only intercepts, swaps the response in, and re-enables the native submit on any failure. A control that cannot be expressed as a form does not belong here.", "section": "components" }
+    ],
+    "dos": [
+      "Do spend the colour budget on Burnt Ochre and nothing else. Links, pressed toggles and focus rings; everything else is Ink, Pencil Grey or Fold Line.",
+      "Do keep the two heading kinds distinct on all four axes — case, size, colour and rule weight. It is what makes a column of sections-containing-days readable.",
+      "Do hold geometry constant across interaction states. Reserve the space a state will need (the 8.5em toggle, the zero-width check-mark slot) so nothing reflows.",
+      "Do set times bold and tabular-nums in the 6ch margin. The straight edge down the page is the scanning affordance.",
+      "Do write every new control as a plain HTML form first, then enhance it.",
+      "Do give any new colour, spacing step or type role a counterpart in both themes before shipping it.",
+      "Do cap long-form text at 68ch even on a 110ch page."
+    ],
+    "donts": [
+      "Don't add a width media query. Use minmax(), min(), ch and intrinsic wrapping.",
+      "Don't add a shadow at rest. Depth is rule weight and fill.",
+      "Don't introduce imagery, thumbnails, avatars or icon sets into the document. The product is text-only by design; the layout has no slot for a picture and must not grow one. (The app icon and PWA assets are the sole exception and live outside the page.)",
+      "Don't add a second accent hue, a status-colour palette, or a tag-colour scheme. Tags are Burnt Ochre links because they are links, not because they are categories.",
+      "Don't round an input to match a button, or add a third radius value.",
+      "Don't animate anything on page load, or animate geometry to acknowledge a press. Motion is --t: 150ms / --t-out: 120ms on one curve (cubic-bezier(.2, 0, 0, 1)), colour-only for state, and fully disabled under prefers-reduced-motion.",
+      "Don't attach hover treatments outside @media (hover: hover). Touch devices must never inherit a sticky hover state.",
+      "Don't use bold as decoration. Bold means one of exactly three things here: a page or section heading, a time, or a current nav item."
+    ]
+  }
+}

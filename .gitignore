@@ -14,3 +14,6 @@ backups/
 # per-machine overrides and the hook's cache are not
 .impeccable/config.local.json
 .impeccable/hook.cache.json
+
+# worktrees created by tooling
+.claude/worktrees/
