@@ -21,7 +21,8 @@ type Base struct {
 	Account *AccountView
 	Path    string
 	Version string
-	Wide    bool // / only: two columns need a wider body
+	Wide    bool   // / only: two columns need a wider body
+	Theme   string // "light" or "dark" when the visitor chose one; "" follows the system
 }
 
 // AccountView is what templates know about the viewer.
@@ -32,7 +33,7 @@ type AccountView struct {
 }
 
 func (s *Server) base(r *http.Request) Base {
-	b := Base{Path: r.URL.Path, Version: s.version}
+	b := Base{Path: r.URL.Path, Version: s.version, Theme: themeFrom(r)}
 	if a := accountFrom(r); a != nil {
 		b.Account = &AccountView{Name: a.Name, Slug: a.Slug, Poster: a.IsPoster()}
 	}

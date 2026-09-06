@@ -4,7 +4,7 @@
   --bg: #FCF8EF;
   --fg: #2E2823;
   --muted: #6C6157;
-  --link: #875800;
+  --link: #6E2A5F;
   --error: #B5261A;
   --rule: #E2D9C9;
   --measure: 68ch;
@@ -13,16 +13,27 @@
   font: 106.25%/1.5 var(--sans);
 }
 
+/* Dark palette: follows the system unless the visitor chose light; the
+   explicit dark choice wins regardless of the system. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #272320;
     --fg: #F1EADF;
     --muted: #B8AC9D;
-    --link: #E9B653;
+    --link: #D8A8CB;
     --error: #FF9585;
     --rule: #4B433B;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #272320;
+  --fg: #F1EADF;
+  --muted: #B8AC9D;
+  --link: #D8A8CB;
+  --error: #FF9585;
+  --rule: #4B433B;
+}
+
 
 
 /* Base */
@@ -153,3 +164,8 @@ h2 { font-size: .9375rem; text-transform: uppercase; letter-spacing: .08em; }
 a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
 button { border-radius: 4px; padding: .3rem .85rem; }
 button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
+
+/* Theme switch: buttons that read as links, the chosen one bold. */
+.linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; text-underline-offset: .18em; font: inherit; cursor: pointer; }
+.linklike[aria-pressed="true"] { background: none; color: var(--fg); font-weight: bold; text-decoration: none; }
+.theme { display: inline; }

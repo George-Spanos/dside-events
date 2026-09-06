@@ -1,5 +1,5 @@
 {{define "layout"}}<!doctype html>
-<html lang="en">
+<html lang="en"{{with .Theme}} data-theme="{{.}}"{{end}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,6 +18,11 @@
   <nav aria-label="Account">
     {{if eq .Path "/account"}}<strong aria-current="page"><a href="/account">account</a></strong>{{else}}<a href="/account">account</a>{{end}}
     {{with .Account}}{{if .Poster}} · {{if eq $.Path "/new"}}<strong aria-current="page"><a href="/new">new</a></strong>{{else}}<a href="/new">new</a>{{end}}{{end}}{{end}}
+    <form method="post" action="/theme" class="inline theme">
+      <input type="hidden" name="back" value="{{.Path}}">
+      · <button name="theme" value="light" class="linklike"{{if eq .Theme "light"}} aria-pressed="true"{{end}}>light</button>
+      · <button name="theme" value="dark" class="linklike"{{if eq .Theme "dark"}} aria-pressed="true"{{end}}>dark</button>
+    </form>
   </nav>
 </header>
 <main>

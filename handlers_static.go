@@ -44,12 +44,12 @@ func (s *Server) initStatic() error {
 	return nil
 }
 
-// drawIcon renders the icon.svg design (64-unit ochre square, white bar at
+// drawIcon renders the icon.svg design (64-unit plum square, white bar at
 // y=40 h=5 x=12 w=40) as a PNG of the given size.
 func drawIcon(size int) ([]byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	ochre := color.RGBA{0x87, 0x58, 0x00, 0xff}
-	draw.Draw(img, img.Bounds(), image.NewUniform(ochre), image.Point{}, draw.Src)
+	plum := color.RGBA{0x6e, 0x2a, 0x5f, 0xff}
+	draw.Draw(img, img.Bounds(), image.NewUniform(plum), image.Point{}, draw.Src)
 	scale := func(u int) int { return u * size / 64 }
 	bar := image.Rect(scale(12), scale(40), scale(52), scale(45))
 	draw.Draw(img, bar, image.NewUniform(color.White), image.Point{}, draw.Src)

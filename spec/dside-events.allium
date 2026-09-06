@@ -14,6 +14,7 @@
 -- specification; the session it presents is all we know about it.
 external entity Visitor {
     session: Session?                       -- the active session named by the cookie, absent otherwise
+    theme: light | dark | null           -- explicit choice kept in a cookie; null follows the system
 }
 
 ------------------------------------------------------------
@@ -444,6 +445,22 @@ rule UnfollowPoster {
 }
 
 -- Account -------------------------------------------------
+
+rule ChooseTheme {
+    when: ChooseTheme(visitor, theme)
+    requires: theme in {light, dark, auto}
+    ensures:
+        if theme = auto:
+            visitor.theme = null
+        else:
+            visitor.theme = theme
+    @guidance
+        -- HTTP: POST /theme with theme=light|dark|auto and back; a one-year
+        -- cookie "theme", cleared by auto; 303 back. Any other value is 400.
+        -- Every page carries the two link-styled buttons "light" and "dark"
+        -- in the header, the chosen one bold; the page root gets
+        -- data-theme so the choice overrides prefers-color-scheme.
+}
 
 rule DeleteAccount {
     when: DeleteAccount(account)
@@ -1050,7 +1067,8 @@ open question "OQ-9 Sessions: fixed 365-day lifetime without sliding renewal, ca
 -- @guarantee CrossSiteWritesRejected.
 open question "OQ-11 Form convention: success 303, validation failure 422 re-render, a session-only POST without a session 303 to /account, wrong role 403, GET on a POST-only route 405? (default: yes)"
 open question "OQ-12 Time: store instants in UTC and treat every calendar boundary (feed start, duplicate check, slug date) in Europe/Athens? (default: yes)"
-open question "OQ-13 UI language and theme: English copy, automatic dark mode from the OS, no toggle? (default: yes)"
+-- OQ-13 (theme) resolved by the founder on 2026-09-06: English copy, dark mode follows
+-- the system by default AND a light/dark switch exists (rule ChooseTheme).
 open question "OQ-14 PWA icon: is a generated SVG/PNG icon the sole exception to no images? (default: yes)"
 open question "OQ-15 Packaging: single Go module dside.studio/events with SQLite as the only third-party dependency, deployed as a Docker image with a data volume? (default: yes)"
 open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their interest toggles)"

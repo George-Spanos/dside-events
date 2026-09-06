@@ -60,6 +60,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /account/key", h(s.accountKey))
 	mux.HandleFunc("POST /account/delete", h(s.accountDelete))
 	mux.HandleFunc("POST /forget", h(s.forget))
+	mux.HandleFunc("POST /theme", h(s.theme))
 
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /static/", s.static)
