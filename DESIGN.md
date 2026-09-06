@@ -235,6 +235,7 @@ Controls are honest and mechanical. A button shows its state rather than adverti
 The Follow control is the system's one piece of real interaction design and it is built around a single principle: **one change, not two.**
 
 - The button reserves `min-width: 8.5em` and centres its label, so switching between "Follow" and "Following" never resizes or reflows the row
+- **Two sizes, one control.** On the event page the toggle is the page's decision and runs at body size behind that 8.5em reservation. In a programme row it is a mark in the margin, not the headline of the line: Meta size, `0.25rem 0.6rem` padding, and the reservation comes down with the type to `7.25em` — still wide enough to hold "✓ Following" without reflowing. The smaller footprint is what lets the toggle ride the title line inside a home column instead of dropping under the row's meta lines
 - A `::before` check-mark slot exists in both states at zero width and zero opacity, expanding to `1.15em` when pressed. The mark appears *with* the colour fill, as one gesture, and the content is `"✓" / ""` so screen readers get the empty alternative rather than a spoken glyph — `aria-pressed` already carries the state
 - Font weight is explicitly held constant (`font-weight: inherit`) across states. Colour changes; geometry does not
 - Hide sits beneath Follow as a `.linklike` button — a real `<button>` styled as an underlined Burnt Ochre link, so a destructive-feeling action never looks like a primary control
