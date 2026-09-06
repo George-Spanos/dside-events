@@ -88,7 +88,8 @@ footer { margin-top: 3rem; }
 .past li { margin-bottom: .5rem; }
 
 /* Home: Mine and Upcoming side by side when there is room, stacked otherwise */
-.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr)); gap: 0 3rem; }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr)); gap: 2.5rem 3rem; }
+.columns section > h2:first-child { margin-top: 0; }
 
 /* Day headings: weekday bold, a rule under each day */
 .day {
@@ -160,7 +161,22 @@ input + .error, textarea + .error, .hint + .error { margin-top: -.75rem; }
    uppercase section labels, bold tabular times, accent-filled pressed buttons. */
 h1 { font-size: 1.75rem; letter-spacing: -.02em; line-height: 1.2; }
 header h1, header .brand { font-size: 1.375rem; letter-spacing: -.03em; }
-h2 { font-size: .9375rem; text-transform: uppercase; letter-spacing: .08em; }
+/* Two headings, two kinds. A section label (Mine, Upcoming, Past) is a small muted
+   uppercase word over a heavy rule; a day is mixed-case ink over a hairline. They
+   differ in case, size, colour and rule weight, so one column still reads as
+   sections containing days rather than one flat run of headings. */
+h2 {
+  font-size: .8125rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  margin-top: 2rem;
+  padding-bottom: .3rem;
+  border-bottom: 2px solid var(--fg);
+}
+.day { color: var(--muted); }
+.day b { color: var(--fg); }
+h2 + .day { margin-top: .75rem; }
 .events time { font-weight: bold; }
 a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
 button { border-radius: 4px; padding: .3rem .85rem; }
