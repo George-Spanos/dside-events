@@ -107,7 +107,7 @@ func TestEventDetail_ShowsAllPublicFields(t *testing.T) {
 	assertContains(t, r, "music.example.test")
 	assertContains(t, r, poster1.Name)
 	assertContains(t, r, `href="/p/`+poster1.Slug+`"`)
-	assertContains(t, r, "Nobody yet interested")
+	assertContains(t, r, "Nobody following yet")
 	assertHeaderContains(t, r, "Cache-Control", "no-store")
 }
 
@@ -133,8 +133,8 @@ func TestEventDetail_PastEventStillReachable(t *testing.T) {
 	assertContains(t, r, f.Title)
 	assertContains(t, r, "This event has passed.")
 	// Past: no buttons for anyone.
-	assertNotContains(t, r, `value="interested"`)
-	assertNotContains(t, r, `value="not_interested"`)
+	assertNotContains(t, r, `value="follow"`)
+	assertNotContains(t, r, `value="hide"`)
 }
 
 // spec: PosterPage, Poster
@@ -172,8 +172,8 @@ func TestPosterPage_Unknown404(t *testing.T) {
 	assertStatus(t, v.get("/p/"+slug), 404)
 }
 
-// spec: EventDetail, StartAccount, Visitor, MarkInterested, MarkNotInterested
-func TestAnon_EventPageOffersInterest_NoOwnerControls(t *testing.T) {
+// spec: EventDetail, StartAccount, Visitor, FollowEvent, HideEvent
+func TestAnon_EventPageOffersFollow_NoOwnerControls(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
 
@@ -181,10 +181,10 @@ func TestAnon_EventPageOffersInterest_NoOwnerControls(t *testing.T) {
 	r := v.get(page)
 	assertStatus(t, r, 200)
 	// The buttons are there for everyone; pressing one starts the account.
-	assertForm(t, r, `action="`+page+`/interest"`, `value="interested"`)
-	assertForm(t, r, `action="`+page+`/interest"`, `value="not_interested"`)
-	assertContains(t, r, "Nobody yet interested")
-	assertNotContains(t, r, "Log in to mark interested")
+	assertForm(t, r, `action="`+page+`/follow"`, `value="follow"`)
+	assertForm(t, r, `action="`+page+`/follow"`, `value="hide"`)
+	assertContains(t, r, "Nobody following yet")
+	assertNotContains(t, r, "Log in to follow")
 	if hasLinkToPath(r.Body, "/login") {
 		t.Errorf("anon event page still links to /login")
 	}
@@ -198,7 +198,7 @@ func TestAnon_EventPageOffersInterest_NoOwnerControls(t *testing.T) {
 	u := newUser(t)
 	ru := u.get(page)
 	assertStatus(t, ru, 200)
-	for _, frag := range []string{`value="interested"`, `value="not_interested"`, "Nobody yet interested"} {
+	for _, frag := range []string{`value="follow"`, `value="hide"`, "Nobody following yet"} {
 		if (hasForm(r.Body, frag) || containsFold(r.Body, frag)) != (hasForm(ru.Body, frag) || containsFold(ru.Body, frag)) {
 			t.Errorf("anon and user event pages differ on %q", frag)
 		}
@@ -250,6 +250,6 @@ func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
 	r := v.get("/e/" + slug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
-	assertContains(t, r, "Nobody yet interested")
+	assertContains(t, r, "Nobody following yet")
 	assertNotListed(t, anon(t), "/upcoming", hijack.Title)
 }

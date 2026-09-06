@@ -4,23 +4,23 @@ import (
 	"context"
 )
 
-// Interest states.
+// Event follow states.
 const (
-	Interested    = "interested"
-	NotInterested = "not_interested"
+	Following = "following"
+	Hidden    = "hidden"
 )
 
-// SetInterest records the account's state for an event (idempotent).
-func (s *Store) SetInterest(ctx context.Context, accountID, eventID int64, state string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO interests (account_id, event_id, state, created_at) VALUES (?, ?, ?, ?)
+// SetEventFollow records the account's state for an event (idempotent).
+func (s *Store) SetEventFollow(ctx context.Context, accountID, eventID int64, state string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO follows_events (account_id, event_id, state, created_at) VALUES (?, ?, ?, ?)
 		ON CONFLICT(account_id, event_id) DO UPDATE SET state = excluded.state, created_at = excluded.created_at`,
 		accountID, eventID, state, now())
 	return err
 }
 
-// ClearInterest removes the account's state for an event (idempotent).
-func (s *Store) ClearInterest(ctx context.Context, accountID, eventID int64) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM interests WHERE account_id = ? AND event_id = ?", accountID, eventID)
+// ClearEventFollow removes the account's state for an event (idempotent).
+func (s *Store) ClearEventFollow(ctx context.Context, accountID, eventID int64) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM follows_events WHERE account_id = ? AND event_id = ?", accountID, eventID)
 	return err
 }
 

@@ -23,28 +23,35 @@ logs to stderr.
 
 | Path | What it shows |
 |---|---|
-| `/`, `/?tag=x` | home: the next 10 upcoming events (a fixed founder decision, not a setting) next to the events you marked, side by side; "All upcoming events →" leads to the full list |
+| `/`, `/?tag=x` | home: the next 10 upcoming events (a fixed founder decision, not a setting) next to the events you follow, side by side; "All upcoming events →" leads to the full list |
 | `/upcoming`, `/upcoming?tag=x` | all upcoming events, day-grouped |
 | `/following` | all upcoming events from the tags and curators you follow |
 | `/mine` | your Upcoming, Past and Hidden events |
-| `/e/{slug}` | one event; Interested / Not interested |
+| `/e/{slug}` | one event; Follow / Hide, and how many follow it |
 | `/p/{slug}` | a curator's events |
 | `/account` | your secret link, follows, forget / delete |
 
-Every upcoming row, on every page, carries the Interested toggle; a pressed
-one reads `✓ Interested`. Unknown `tag` values are 404.
+Every upcoming row, on every page, carries the Follow toggle
+(`POST /e/{slug}/follow` with `state=follow|hide|clear`); a pressed one reads
+`✓ Following`. Hiding is only offered on the event page and stays private.
+Unknown `tag` values are 404. An event carries at most 3 links.
+
+| Route | Form fields |
+|---|---|
+| `POST /e/{slug}/follow` | `state` = `follow`, `hide` or `clear`; `back` |
+| `POST /follow` | `kind` = `tag` or `poster`; `key`; `on` = `1` or `0`; `back` |
 
 ## Accounts
 
 There is no sign-up and no email. Everyone browses; the first press of
-Interested or Follow creates an anonymous account and keeps it in a cookie
+Follow (an event, a tag or a curator) creates an anonymous account and keeps it in a cookie
 (`session`, HttpOnly, SameSite=Lax, 365 days). The account page shows a
 **secret link** (`/k/<key>`): opening it on another device continues the same
 account there, and opening it while another account's cookie is present
 switches to the link's account. "Get a new link" replaces the key (the old
 link stops working; devices already using the account stay in). "Forget this
 device" drops the cookie only; the link still opens the account. "Delete
-account" removes the account, its interests, follows and sessions.
+account" removes the account, its follows, hidden events and sessions.
 
 Curators (posters) are created by hand and log in with the same kind of link:
 
@@ -87,7 +94,7 @@ publishes `ghcr.io/george-spanos/dside-events:latest` (plus a `:<sha>` tag) via
 
     BASE_URL=https://events.example.com make prod-up
     make prod-curators                        # creates the two curators, prints their secret links
-    make prod-poster-link SLUG=george-spanos  # replace a curator's link
+    make prod-poster-links                    # list every curator's secret link (also saved to curators.txt)
 
 `prod-curators` is idempotent: the names live in the `CURATORS` variable of the
 Makefile; re-running prints `link (unchanged, …)` for curators that already exist.
@@ -117,8 +124,8 @@ printed inside the curators' secret links.
 
 - Every form works without JavaScript: success → 303, validation failure → 422
   with the submitted values, wrong role (including no account) → 403.
-- Interested and Follow never need a prior login: without a session they create
-  the account first, then act. Read pages never redirect; without a session
+- Follow (event, tag or curator) never needs a prior login: without a session it
+  creates the account first, then acts. Read pages never redirect; without a session
   `/mine`, `/following` and `/account` show an empty state.
 - Times are stored as unix seconds (UTC) and shown in Europe/Athens.
 - Event URLs never change after publishing.

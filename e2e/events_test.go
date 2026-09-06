@@ -24,13 +24,13 @@ func TestCreateEvent_Success(t *testing.T) {
 	r := p.get("/new")
 	assertStatus(t, r, 200)
 	assertForm(t, r, `action="/new"`, `name="title"`)
-	// max_links is enforced by the form itself: exactly five link slots, and
-	// the contract has no sixth field.
-	for i := 1; i <= 5; i++ {
+	// max_links is enforced by the form itself: exactly three link slots, and
+	// the contract has no fourth field.
+	for i := 1; i <= 3; i++ {
 		assertContains(t, r, fmt.Sprintf(`name="link_url_%d"`, i))
 		assertContains(t, r, fmt.Sprintf(`name="link_label_%d"`, i))
 	}
-	assertNotContains(t, r, `name="link_url_6"`)
+	assertNotContains(t, r, `name="link_url_4"`)
 	// max_tags is a server rule (see the validation table); every tag is offered.
 	for _, tag := range []string{"concert", "theater", "film", "exhibition"} {
 		assertContains(t, r, `value="`+tag+`"`)
@@ -303,12 +303,12 @@ func TestEditEvent_Unknown404(t *testing.T) {
 }
 
 // spec: DeleteEvent, EventEditor, MyEvents
-func TestDeleteEvent_OwnerDeletes_CascadesInterest(t *testing.T) {
+func TestDeleteEvent_OwnerDeletes_CascadesFollows(t *testing.T) {
 	p := asPoster(t, poster1)
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, p, f)
 	alice := newUser(t)
-	assertRedirect(t, setInterest(alice, slug, "interested", "/e/"+slug), "/e/"+slug)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/e/"+slug), "/e/"+slug)
 	assertContains(t, alice.get("/mine"), f.Title)
 
 	assertRedirect(t, p.postForm("/e/"+slug+"/delete", nil), "/")

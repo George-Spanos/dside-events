@@ -144,13 +144,36 @@ func (s *Store) RotateKey(ctx context.Context, id int64) (string, error) {
 	return key, nil
 }
 
+// PosterLink is one curator with the secret key that logs them in.
+type PosterLink struct {
+	Name, Slug, Key string
+}
+
+// Posters lists every curator with their current secret key, by name.
+func (s *Store) Posters(ctx context.Context) ([]PosterLink, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT name, COALESCE(slug, ''), key FROM accounts WHERE role = 'poster' ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PosterLink
+	for rows.Next() {
+		var pl PosterLink
+		if err := rows.Scan(&pl.Name, &pl.Slug, &pl.Key); err != nil {
+			return nil, err
+		}
+		out = append(out, pl)
+	}
+	return out, rows.Err()
+}
+
 // PosterBySlug returns the poster with the given slug.
 func (s *Store) PosterBySlug(ctx context.Context, slug string) (*Account, error) {
 	return scanAccount(s.db.QueryRowContext(ctx,
 		"SELECT "+accountCols+" FROM accounts WHERE slug = ? AND role = 'poster'", slug))
 }
 
-// DeleteAccount removes the account; sessions, interests and follows cascade.
+// DeleteAccount removes the account; sessions, event follows and tag/curator follows cascade.
 func (s *Store) DeleteAccount(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM accounts WHERE id = ?", id)
 	return err

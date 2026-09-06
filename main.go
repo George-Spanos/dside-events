@@ -4,6 +4,7 @@
 //	dside-events serve
 //	dside-events add-poster -name "Maria P." [-slug maria]
 //	dside-events poster-link -slug maria
+//	dside-events poster-links
 package main
 
 import (
@@ -23,7 +24,7 @@ import (
 	"dside.studio/events/internal/store"
 )
 
-const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y"
+const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -48,6 +49,8 @@ func run(args []string) error {
 		return addPoster(cfg, args[1:])
 	case "poster-link":
 		return posterLink(cfg, args[1:])
+	case "poster-links":
+		return posterLinks(cfg)
 	default:
 		return fmt.Errorf("unknown command %q\n%s", args[0], usage)
 	}
@@ -189,5 +192,23 @@ func posterLink(cfg Config, args []string) error {
 		return err
 	}
 	fmt.Printf("link %s\n", cfg.secretLink(key))
+	return nil
+}
+
+// posterLinks prints every curator with their current secret link.
+func posterLinks(cfg Config) error {
+	st, ctx, cancel, err := openStore(cfg)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer st.Close()
+	posters, err := st.Posters(ctx)
+	if err != nil {
+		return err
+	}
+	for _, p := range posters {
+		fmt.Printf("poster %s %s\nlink %s\n", p.Slug, p.Name, cfg.secretLink(p.Key))
+	}
 	return nil
 }

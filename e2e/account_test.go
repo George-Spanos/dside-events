@@ -49,19 +49,19 @@ func TestAccount_Poster_CuratorPageAndNoDelete(t *testing.T) {
 	assertNotContains(t, r, "@")
 }
 
-// spec: DeleteAccount, AccountPage, Event.interested_count, Session, SecretLink, Interest, TagFollow, PosterFollow
+// spec: DeleteAccount, AccountPage, Event.follower_count, Session, SecretLink, EventFollow, TagFollow, PosterFollow
 func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 	c := newUser(t)
 	old := c.cookie("session")
-	assertRedirect(t, setInterest(c, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(c, slug, "follow", page), page)
 	assertRedirect(t, follow(c, "tag", "theater", "1", "/account"), "/account")
 	assertRedirect(t, follow(c, "poster", poster1.Slug, "1", "/account"), "/account")
 	link, _ := secretLink(t, c)
 	other := openLink(t, shared, link) // the same account on a second device
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Fatalf("counter = %d, want 1", n)
 	}
 
@@ -92,13 +92,13 @@ func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	assertStatus(t, r, 404)
 	assertCopy(t, r, copyLinkBroken)
 
-	// Interests cascaded: the public counter drops.
-	if n := interestedCount(t, anon(t).get(page).Body); n != 0 {
+	// Event follows cascaded: the public counter drops.
+	if n := followerCount(t, anon(t).get(page).Body); n != 0 {
 		t.Errorf("counter after account deletion = %d, want 0", n)
 	}
 
-	// Pressing Interested again starts from a clean, different account.
-	assertRedirect(t, setInterest(c, slug, "interested", page), page)
+	// Pressing Follow again starts from a clean, different account.
+	assertRedirect(t, setEventFollow(c, slug, "follow", page), page)
 	if l, _ := secretLink(t, c); l == link {
 		t.Errorf("new account after deletion got the deleted link back")
 	}
@@ -106,7 +106,7 @@ func TestDeleteAccount_RemovesDataSessionAndLink(t *testing.T) {
 	assertNoForm(t, r, `action="/follow"`, `value="tag"`, `value="theater"`, `value="0"`)
 	assertNotContains(t, r, `href="/p/`+poster1.Slug+`"`)
 	assertNotContains(t, c.get(page), "Hidden from your feed")
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter = %d, want 1 (new account only)", n)
 	}
 }
@@ -126,6 +126,8 @@ func TestDeleteAccount_RequiresConfirm(t *testing.T) {
 		t.Errorf("a refused delete changed the account (link %q → %q)", link, l)
 	}
 	assertStatus(t, c.get("/account/delete"), 405)
+	// The account page says what deleting does.
+	assertCopy(t, c.get("/account"), copyAccountDelete)
 }
 
 // spec: DeleteAccount, AccountPage, Poster

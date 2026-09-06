@@ -1,0 +1,15 @@
+{{define "eventfollow"}}
+{{if not .Past}}
+<form method="post" action="{{.Action}}" data-toggle class="follow">
+  <input type="hidden" name="back" value="{{.Back}}">
+  <button name="state" value="{{if eq .State "following"}}clear{{else}}follow{{end}}" aria-pressed="{{if eq .State "following"}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if eq .State "following"}}Following{{else}}Follow{{end}}</button>
+  <button name="state" value="{{if eq .State "hidden"}}clear{{else}}hide{{end}}" aria-pressed="{{if eq .State "hidden"}}true{{else}}false{{end}}" data-on="Hidden" data-off="Hide">{{if eq .State "hidden"}}Hidden{{else}}Hide{{end}}</button>
+  <span class="count">{{template "counter" .}}</span>
+  {{if eq .State "hidden"}}<br><small>Hidden from your feed.</small>{{end}}
+</form>
+{{else}}
+<p class="follow"><span class="count">{{template "counter" .}}</span></p>
+{{end}}
+{{end}}
+
+{{define "counter"}}{{if .Count}}{{.Count}} {{if .Past}}followed{{else}}following{{end}}{{else}}Nobody {{if .Past}}followed{{else}}following yet{{end}}{{end}}{{end}}

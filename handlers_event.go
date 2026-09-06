@@ -116,13 +116,21 @@ func (s *Server) deleteEvent(w http.ResponseWriter, r *http.Request) error {
 	return redirect(w, r, "/")
 }
 
-// interest records the visitor's state for an event. The first press from a
-// device without a session starts its anonymous account (after the event and
-// the state have been validated, so a 404 or 400 creates nothing).
-func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
+// followEvent records the visitor's state for an event: state=follow,
+// state=hide or state=clear. The first press from a device without a session
+// starts its anonymous account (after the event and the state have been
+// validated, so a 404 or 400 creates nothing).
+func (s *Server) followEvent(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("slug")
-	state := r.PostFormValue("state")
-	if state != store.Interested && state != store.NotInterested && state != "clear" {
+	var state string
+	switch r.PostFormValue("state") {
+	case "follow":
+		state = store.Following
+	case "hide":
+		state = store.Hidden
+	case "clear":
+		state = "clear"
+	default:
 		return errBadRequest
 	}
 	e, err := s.store.EventBySlug(r.Context(), slug, viewerID(accountFrom(r)))
@@ -138,9 +146,9 @@ func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if state == "clear" {
-		err = s.store.ClearInterest(r.Context(), acct.ID, e.ID)
+		err = s.store.ClearEventFollow(r.Context(), acct.ID, e.ID)
 	} else {
-		err = s.store.SetInterest(r.Context(), acct.ID, e.ID, state)
+		err = s.store.SetEventFollow(r.Context(), acct.ID, e.ID, state)
 	}
 	if err != nil {
 		return err
@@ -148,7 +156,7 @@ func (s *Server) interest(w http.ResponseWriter, r *http.Request) error {
 	return redirect(w, r, backOr(r, "/e/"+slug))
 }
 
-// follow toggles a tag or curator follow. Like interest, it starts the
+// follow toggles a tag or curator follow. Like followEvent, it starts the
 // visitor's account lazily, only once the target is known to exist.
 func (s *Server) follow(w http.ResponseWriter, r *http.Request) error {
 	kind, key, on := r.PostFormValue("kind"), r.PostFormValue("key"), r.PostFormValue("on")

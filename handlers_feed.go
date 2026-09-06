@@ -10,29 +10,29 @@ import (
 
 const homeListSize = 10 // founder decision, deliberately not configurable
 
-// InterestView drives the "interest" partial on the event page (both
+// FollowView drives the "eventfollow" partial on the event page (both
 // buttons + counter).
-type InterestView struct {
+type FollowView struct {
 	Action string
 	Back   string
-	State  string // "", interested, not_interested
+	State  string // "", following, hidden
 	Count  int
 	Past   bool
 }
 
 // EventRow is one line of the programme list. Back is non-empty for upcoming
-// rows, which carry the Interested toggle posting back to that URL.
+// rows, which carry the Follow toggle posting back to that URL.
 type EventRow struct {
 	Slug       string
 	Title      string
 	Start      time.Time
 	Venue      string
 	Price      string
-	Interested int
+	Followers  int
 	Tags       []string
 	PosterName string
 	PosterSlug string
-	Marked     bool   // the viewer is interested
+	Following  bool   // the viewer follows the event
 	Back       string // current path incl. query; "" for past rows (no toggle)
 }
 
@@ -76,14 +76,14 @@ type homePage struct {
 	Base
 	Filters   []Filter
 	TagFollow *tagFollowView
-	Mine      DayList // empty without a session or without upcoming marks
+	Mine      DayList // empty without a session or without upcoming followed events
 	Upcoming  DayList
 	Empty     string
 	AllHref   string // /upcoming, with the tag filter when set
 }
 
 func row(e store.Event) EventRow {
-	return EventRow{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price, Interested: e.Interested,
+	return EventRow{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price, Followers: e.Followers,
 		Tags: e.Tags, PosterName: e.PosterName, PosterSlug: e.PosterSlug}
 }
 
@@ -96,13 +96,13 @@ func rows(events []store.Event) []EventRow {
 	return out
 }
 
-// toggleRows converts upcoming events; every row carries the Interested
+// toggleRows converts upcoming events; every row carries the Follow
 // toggle, which returns the visitor to back.
 func toggleRows(events []store.Event, back string) []EventRow {
 	out := make([]EventRow, 0, len(events))
 	for _, e := range events {
 		rw := row(e)
-		rw.Marked, rw.Back = e.ViewerState == store.Interested, back
+		rw.Following, rw.Back = e.ViewerState == store.Following, back
 		out = append(out, rw)
 	}
 	return out
@@ -188,7 +188,7 @@ func (s *Server) tagFilter(r *http.Request, acct *store.Account) (tag string, fo
 	return tag, follow, "No upcoming events tagged " + tag + ".", nil
 }
 
-// home is the front page: the visitor's next marked events (when any) next
+// home is the front page: the visitor's next followed events (when any) next
 // to the next homeListSize upcoming events.
 func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
@@ -209,11 +209,11 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	}
 	page.Upcoming = s.morph(s.groupByDay(toggleRows(events, back)))
 	if acct != nil {
-		interested, err := s.store.InterestedEvents(r.Context(), acct.ID)
+		followed, err := s.store.FollowedEvents(r.Context(), acct.ID)
 		if err != nil {
 			return err
 		}
-		mine, _ := s.splitPast(interested)
+		mine, _ := s.splitPast(followed)
 		if len(mine) > homeListSize {
 			mine = mine[:homeListSize]
 		}
@@ -268,17 +268,17 @@ type minePage struct {
 	Upcoming DayList
 	Past     []EventRow
 	Hidden   []EventRow
-	Empty    bool // no marks at all, neither interested nor hidden
+	Empty    bool // nothing at all, neither followed nor hidden
 }
 
-// mine lists the visitor's interested and hidden events; a device without a
+// mine lists the visitor's followed and hidden events; a device without a
 // session sees the empty state.
 func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	acct := accountFrom(r)
 	if acct == nil {
 		return s.render(w, r, http.StatusOK, "mine", minePage{Base: s.base(r), Empty: true})
 	}
-	interested, err := s.store.InterestedEvents(r.Context(), acct.ID)
+	followed, err := s.store.FollowedEvents(r.Context(), acct.ID)
 	if err != nil {
 		return err
 	}
@@ -286,9 +286,9 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	upcoming, past := s.splitPast(interested)
+	upcoming, past := s.splitPast(followed)
 	page := minePage{Base: s.base(r), Upcoming: s.morph(s.groupByDay(toggleRows(upcoming, r.URL.RequestURI()))),
-		Past: rows(past), Hidden: rows(hidden), Empty: len(interested) == 0 && len(hidden) == 0}
+		Past: rows(past), Hidden: rows(hidden), Empty: len(followed) == 0 && len(hidden) == 0}
 	return s.render(w, r, http.StatusOK, "mine", page)
 }
 
@@ -312,9 +312,9 @@ type eventView struct {
 
 type eventPage struct {
 	Base
-	Event    eventView
-	Interest InterestView
-	CanEdit  bool
+	Event   eventView
+	Follow  FollowView
+	CanEdit bool
 }
 
 func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
@@ -328,8 +328,8 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
 		Base: s.base(r),
 		Event: eventView{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price,
 			Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug}},
-		Interest: InterestView{Action: "/e/" + e.Slug + "/interest", Back: "/e/" + e.Slug, State: e.ViewerState,
-			Count: e.Interested, Past: past},
+		Follow: FollowView{Action: "/e/" + e.Slug + "/follow", Back: "/e/" + e.Slug, State: e.ViewerState,
+			Count: e.Followers, Past: past},
 		CanEdit: acct != nil && acct.ID == e.PosterID,
 	}
 	return s.render(w, r, http.StatusOK, "event", page)

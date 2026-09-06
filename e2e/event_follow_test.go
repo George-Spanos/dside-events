@@ -7,33 +7,33 @@ import (
 	"testing"
 )
 
-// spec: MarkInterested, EventDetail, MyEvents, UpcomingAll
-func TestInterested_CounterPublic_AppearsInMine(t *testing.T) {
+// spec: FollowEvent, EventDetail, MyEvents, UpcomingAll, Event.follower_count, Account.followed_events
+func TestFollow_CounterPublic_AppearsInMine(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 
 	v := anon(t)
-	if n := interestedCount(t, v.get(page).Body); n != 0 {
+	if n := followerCount(t, v.get(page).Body); n != 0 {
 		t.Fatalf("fresh event counter = %d, want 0", n)
 	}
 
 	alice := newUser(t)
 	r := alice.get(page)
 	assertStatus(t, r, 200)
-	assertForm(t, r, `action="`+page+`/interest"`, `value="interested"`)
-	assertForm(t, r, `action="`+page+`/interest"`, `value="not_interested"`)
+	assertForm(t, r, `action="`+page+`/follow"`, `value="follow"`)
+	assertForm(t, r, `action="`+page+`/follow"`, `value="hide"`)
 	assertNotContains(t, alice.get("/mine"), f.Title)
 
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
 
 	r = v.get(page)
 	assertStatus(t, r, 200)
-	if n := interestedCount(t, r.Body); n != 1 {
+	if n := followerCount(t, r.Body); n != 1 {
 		t.Errorf("public counter = %d, want 1", n)
 	}
-	assertContains(t, r, "1 interested")
-	assertNotContains(t, r, "Nobody yet interested")
+	assertContains(t, r, "1 following")
+	assertNotContains(t, r, "Nobody following yet")
 
 	r = alice.get("/mine")
 	assertStatus(t, r, 200)
@@ -47,50 +47,50 @@ func TestInterested_CounterPublic_AppearsInMine(t *testing.T) {
 	if row == "" {
 		t.Fatalf("/upcoming has no row for %q", f.Title)
 	}
-	if !strings.Contains(row, "1 interested") {
-		t.Errorf("/upcoming row for %q lacks '1 interested':\n%s", f.Title, snippet(row))
+	if !strings.Contains(row, "1 following") {
+		t.Errorf("/upcoming row for %q lacks '1 following':\n%s", f.Title, snippet(row))
 	}
 
 	// Redirect target is the back field; a foreign back falls back to the event.
-	assertRedirect(t, setInterest(alice, slug, "interested", "/mine"), "/mine")
-	assertRedirect(t, setInterest(alice, slug, "interested", "https://evil.example/"), page)
-	assertRedirect(t, setInterest(alice, slug, "interested", ""), page)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "https://evil.example/"), page)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", ""), page)
 }
 
-// spec: MarkInterested, OneInterestPerAccountEvent
-func TestInterested_IdempotentPerUser(t *testing.T) {
+// spec: FollowEvent, OneFollowPerAccountEvent
+func TestFollow_IdempotentPerUser(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
 	alice := newUser(t)
 	for i := 0; i < 3; i++ {
-		assertRedirect(t, setInterest(alice, slug, "interested", page), page)
+		assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
 	}
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter after three identical marks = %d, want 1", n)
 	}
 }
 
-// spec: MarkInterested, Event.interested_count
-func TestInterested_TwoUsersCountTwo(t *testing.T) {
+// spec: FollowEvent, Event.follower_count
+func TestFollow_TwoUsersCountTwo(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
 	alice := newUser(t)
 	bob := newUser(t)
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
-	assertRedirect(t, setInterest(bob, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
+	assertRedirect(t, setEventFollow(bob, slug, "follow", page), page)
 	r := anon(t).get(page)
-	if n := interestedCount(t, r.Body); n != 2 {
+	if n := followerCount(t, r.Body); n != 2 {
 		t.Errorf("counter = %d, want 2", n)
 	}
-	assertContains(t, r, "2 interested")
+	assertContains(t, r, "2 following")
 	// A poster sees the same public number, nothing more.
-	if n := interestedCount(t, asPoster(t, poster1).get(page).Body); n != 2 {
+	if n := followerCount(t, asPoster(t, poster1).get(page).Body); n != 2 {
 		t.Errorf("poster sees counter %d, want 2", n)
 	}
 }
 
-// spec: MarkNotInterested, UpcomingAll, Home, EventDetail
-func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
+// spec: HideEvent, EventDetail.HiddenIsPrivate, UpcomingAll, Home, EventDetail, Account.hidden_events
+func TestHide_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	f.Tags = []string{"exhibition"}
 	slug := createEvent(t, asPoster(t, poster1), f)
@@ -102,7 +102,7 @@ func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	assertListed(t, alice, "/upcoming?tag=exhibition", f.Title)
 	assertListed(t, alice, "/following", f.Title)
 
-	assertRedirect(t, setInterest(alice, slug, "not_interested", page), page)
+	assertRedirect(t, setEventFollow(alice, slug, "hide", page), page)
 
 	// Hidden from every list alice sees, the home page included.
 	for _, path := range []string{"/upcoming", "/upcoming?tag=exhibition", "/following", "/", "/?tag=exhibition"} {
@@ -112,7 +112,7 @@ func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 	r := alice.get(page)
 	assertStatus(t, r, 200)
 	assertContains(t, r, "Hidden from your feed")
-	assertForm(t, r, `action="`+page+`/interest"`, `value="clear"`)
+	assertForm(t, r, `action="`+page+`/follow"`, `value="clear"`)
 
 	// Everyone else sees the event untouched, counter unchanged, no trace.
 	for name, c := range map[string]*client{"anon": anon(t), "bob": bob, "poster": asPoster(t, poster1)} {
@@ -122,23 +122,23 @@ func TestNotInterested_HiddenFromOwnFeed_InvisibleToOthers(t *testing.T) {
 		}
 		r := c.get(page)
 		assertStatus(t, r, 200)
-		if n := interestedCount(t, r.Body); n != 0 {
+		if n := followerCount(t, r.Body); n != 0 {
 			t.Errorf("%s: counter = %d, want 0", name, n)
 		}
-		if strings.Contains(r.Body, "Hidden from your feed") || containsFold(r.Body, "not interested by") {
-			t.Errorf("%s: event page leaks alice's not_interested mark", name)
+		if strings.Contains(r.Body, "Hidden from your feed") || pressedHidden.MatchString(r.Body) {
+			t.Errorf("%s: event page leaks alice's hidden state", name)
 		}
 	}
 	// The poster's own list is untouched as well.
 	assertContains(t, anon(t).get("/p/"+poster1.Slug), f.Title)
 }
 
-// spec: MarkNotInterested, MyEvents
-func TestNotInterested_NotInMineUpcoming_ButInHidden(t *testing.T) {
+// spec: HideEvent, MyEvents, Account.hidden_events
+func TestHide_NotInMineUpcoming_ButInHidden(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	alice := newUser(t)
-	assertRedirect(t, setInterest(alice, slug, "not_interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, slug, "hide", "/mine"), "/mine")
 
 	r := alice.get("/mine")
 	assertStatus(t, r, 200)
@@ -152,25 +152,27 @@ func TestNotInterested_NotInMineUpcoming_ButInHidden(t *testing.T) {
 			t.Errorf("hidden event %q listed under Upcoming", f.Title)
 		}
 	}
-	assertForm(t, r, `action="/e/`+slug+`/interest"`, `value="clear"`)
+	assertCopy(t, r, copyMineHidden)
+	assertContains(t, r, "Show again")
+	assertForm(t, r, `action="/e/`+slug+`/follow"`, `value="clear"`)
 }
 
-// spec: MarkInterested, MarkNotInterested, OneInterestPerAccountEvent
-func TestInterest_SwitchInterestedToNotInterested(t *testing.T) {
+// spec: FollowEvent, HideEvent, OneFollowPerAccountEvent
+func TestEventFollow_SwitchFollowToHide(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 	alice := newUser(t)
 	v := anon(t)
 
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
-	if n := interestedCount(t, v.get(page).Body); n != 1 {
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
+	if n := followerCount(t, v.get(page).Body); n != 1 {
 		t.Fatalf("counter = %d, want 1", n)
 	}
 	assertListed(t, alice, "/upcoming", f.Title)
 
-	assertRedirect(t, setInterest(alice, slug, "not_interested", page), page)
-	if n := interestedCount(t, v.get(page).Body); n != 0 {
+	assertRedirect(t, setEventFollow(alice, slug, "hide", page), page)
+	if n := followerCount(t, v.get(page).Body); n != 0 {
 		t.Errorf("counter after switching = %d, want 0", n)
 	}
 	assertNotListed(t, alice, "/upcoming", f.Title)
@@ -178,59 +180,59 @@ func TestInterest_SwitchInterestedToNotInterested(t *testing.T) {
 	assertBefore(t, r, "Hidden", f.Title)
 
 	// And back again.
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
-	if n := interestedCount(t, v.get(page).Body); n != 1 {
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
+	if n := followerCount(t, v.get(page).Body); n != 1 {
 		t.Errorf("counter after switching back = %d, want 1", n)
 	}
 	assertListed(t, alice, "/upcoming", f.Title)
 	assertNotContains(t, alice.get(page), "Hidden from your feed")
 }
 
-// spec: ClearInterest, MyEvents, UpcomingAll
-func TestInterest_Clear_RestoresDefault(t *testing.T) {
+// spec: UnfollowEvent, MyEvents, UpcomingAll
+func TestEventFollow_Clear_RestoresDefault(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 	alice := newUser(t)
 	v := anon(t)
 
-	// not_interested → clear: back in the list, gone from /mine.
-	assertRedirect(t, setInterest(alice, slug, "not_interested", page), page)
+	// hide → clear: back in the list, gone from /mine.
+	assertRedirect(t, setEventFollow(alice, slug, "hide", page), page)
 	assertNotListed(t, alice, "/upcoming", f.Title)
-	assertRedirect(t, setInterest(alice, slug, "clear", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, slug, "clear", "/mine"), "/mine")
 	assertListed(t, alice, "/upcoming", f.Title)
 	assertNotContains(t, alice.get("/mine"), f.Title)
 	assertNotContains(t, alice.get(page), "Hidden from your feed")
 
-	// interested → clear: counter drops, gone from /mine.
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
-	if n := interestedCount(t, v.get(page).Body); n != 1 {
+	// follow → clear: counter drops, gone from /mine.
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
+	if n := followerCount(t, v.get(page).Body); n != 1 {
 		t.Fatalf("counter = %d, want 1", n)
 	}
-	assertRedirect(t, setInterest(alice, slug, "clear", page), page)
-	if n := interestedCount(t, v.get(page).Body); n != 0 {
+	assertRedirect(t, setEventFollow(alice, slug, "clear", page), page)
+	if n := followerCount(t, v.get(page).Body); n != 0 {
 		t.Errorf("counter after clear = %d, want 0", n)
 	}
 	assertNotContains(t, alice.get("/mine"), f.Title)
 
 	// Clearing when nothing is marked is a harmless no-op.
-	assertRedirect(t, setInterest(alice, slug, "clear", page), page)
+	assertRedirect(t, setEventFollow(alice, slug, "clear", page), page)
 }
 
-// spec: ClearInterest, MarkInterested
-func TestInterest_BadStateOrUnknownEvent(t *testing.T) {
+// spec: UnfollowEvent, FollowEvent, FollowState
+func TestEventFollow_BadStateOrUnknownEvent(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	alice := newUser(t)
-	assertStatus(t, setInterest(alice, slug, "maybe", ""), 400)
-	assertStatus(t, setInterest(alice, slug, "", ""), 400)
-	assertStatus(t, alice.postForm("/e/"+slug+"/interest", url.Values{"back": {"/"}}), 400)
-	assertStatus(t, setInterest(alice, "no-such-event-2030-01-01", "interested", ""), 404)
-	if n := interestedCount(t, anon(t).get("/e/"+slug).Body); n != 0 {
+	assertStatus(t, setEventFollow(alice, slug, "maybe", ""), 400)
+	assertStatus(t, setEventFollow(alice, slug, "", ""), 400)
+	assertStatus(t, alice.postForm("/e/"+slug+"/follow", url.Values{"back": {"/"}}), 400)
+	assertStatus(t, setEventFollow(alice, "no-such-event-2030-01-01", "follow", ""), 404)
+	if n := followerCount(t, anon(t).get("/e/"+slug).Body); n != 0 {
 		t.Errorf("counter = %d after rejected posts, want 0", n)
 	}
 }
 
-// spec: MyEvents, EventDetail, Event.is_upcoming
+// spec: MyEvents, EventDetail, Event.is_upcoming, Account.followed_events
 func TestMine_UpcomingVsPast(t *testing.T) {
 	p := asPoster(t, poster1)
 	up := validEvent(t, tomorrow())
@@ -245,11 +247,11 @@ func TestMine_UpcomingVsPast(t *testing.T) {
 	r := alice.get("/e/" + pastSlug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, "This event has passed.")
-	assertNotContains(t, r, `value="interested"`)
-	assertNotContains(t, r, `value="not_interested"`)
+	assertNotContains(t, r, `value="follow"`)
+	assertNotContains(t, r, `value="hide"`)
 
-	assertRedirect(t, setInterest(alice, upSlug, "interested", "/mine"), "/mine")
-	assertRedirect(t, setInterest(alice, pastSlug, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, upSlug, "follow", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, pastSlug, "follow", "/mine"), "/mine")
 
 	r = alice.get("/mine")
 	assertStatus(t, r, 200)
@@ -261,11 +263,11 @@ func TestMine_UpcomingVsPast(t *testing.T) {
 
 	// Past tense on a past event's counter.
 	r = anon(t).get("/e/" + pastSlug)
-	assertContains(t, r, "1 were interested")
-	if n := interestedCount(t, r.Body); n != 1 {
+	assertContains(t, r, "1 followed")
+	if n := followerCount(t, r.Body); n != 1 {
 		t.Errorf("past counter = %d, want 1", n)
 	}
-	// The past event never reaches the upcoming lists even when someone is interested.
+	// The past event never reaches the upcoming lists even when someone follows it.
 	assertNotListed(t, anon(t), "/upcoming", past.Title)
 	assertNotListed(t, anon(t), "/", past.Title)
 }
@@ -282,53 +284,53 @@ func TestMine_Empty(t *testing.T) {
 	assertContains(t, r, `href="/`)
 }
 
-// spec: MarkInterested, StartAccount, EventDetail, MyEvents, Interest, Visitor
-func TestInterested_AnonMarkStartsAccount(t *testing.T) {
+// spec: FollowEvent, StartAccount, EventDetail, MyEvents, EventFollow, Visitor
+func TestFollow_AnonFollowStartsAccount(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 
 	v := anon(t)
-	r := setInterest(v, slug, "interested", "/mine")
+	r := setEventFollow(v, slug, "follow", "/mine")
 	assertRedirect(t, r, "/mine")
 	if v.cookie("session") == nil {
-		t.Fatalf("anonymous Interested did not set a session cookie")
+		t.Fatalf("anonymous Follow did not set a session cookie")
 	}
 	r = v.follow(r)
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	r = v.get(page)
 	assertStatus(t, r, 200)
-	if n := interestedCount(t, r.Body); n != 1 {
+	if n := followerCount(t, r.Body); n != 1 {
 		t.Errorf("counter = %d, want 1", n)
 	}
-	// Not interested from a fresh visitor works the same way and hides the
+	// Hide from a fresh visitor works the same way and hides the
 	// event from that visitor's lists only.
 	w := anon(t)
-	assertRedirect(t, setInterest(w, slug, "not_interested", page), page)
+	assertRedirect(t, setEventFollow(w, slug, "hide", page), page)
 	if w.cookie("session") == nil {
-		t.Fatalf("anonymous Not interested did not set a session cookie")
+		t.Fatalf("anonymous Hide did not set a session cookie")
 	}
 	assertNotListed(t, w, "/upcoming", f.Title)
 	assertContains(t, w.get(page), "Hidden from your feed")
 	assertListed(t, anon(t), "/upcoming", f.Title)
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
-		t.Errorf("counter after a not_interested = %d, want 1", n)
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
+		t.Errorf("counter after a hide = %d, want 1", n)
 	}
 }
 
 // ---- row toggles --------------------------------------------------------------
 
 var (
-	pressedRowButton   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
-	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*I'm interested\s*</button>`)
+	pressedRowButton   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Following\s*</button>`)
+	unpressedRowButton = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Follow\s*</button>`)
 )
 
 // assertRowToggle checks one list row against the row-toggle contract: a
-// POST form to /e/{slug}/interest with a hidden back field and a single
+// POST form to /e/{slug}/follow with a hidden back field and a single
 // state button that is either pressed (aria-pressed="true", the check mark is drawn by CSS,
-// value="clear") or not (Interested, aria-pressed="false",
-// value="interested"). Rows never offer not_interested.
+// value="clear") or not (Follow, aria-pressed="false",
+// value="follow"). Rows never offer hide; that lives on the event page.
 func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 	t.Helper()
 	if row == "" {
@@ -339,8 +341,8 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 		t.Helper()
 		t.Errorf("%s: row for /e/%s %s\nrow: %s", page, slug, what, snippet(row))
 	}
-	if !strings.Contains(row, `<form method="post" action="/e/`+slug+`/interest"`) {
-		fail(`lacks <form method="post" action="/e/{slug}/interest"`)
+	if !strings.Contains(row, `<form method="post" action="/e/`+slug+`/follow"`) {
+		fail(`lacks <form method="post" action="/e/{slug}/follow"`)
 		return
 	}
 	if !strings.Contains(row, `name="state"`) {
@@ -349,8 +351,8 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 	if !strings.Contains(row, `name="back"`) {
 		fail(`lacks the hidden name="back" field`)
 	}
-	if strings.Contains(row, "not_interested") || strings.Contains(row, "Not interested") {
-		fail("offers not_interested; that belongs to the event page only")
+	if strings.Contains(row, `value="hide"`) || strings.Contains(row, "Hide") {
+		fail("offers hide; that belongs to the event page only")
 	}
 	if pressed {
 		for _, want := range []string{`value="clear"`, `aria-pressed="true"`} {
@@ -359,21 +361,21 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 			}
 		}
 		if !pressedRowButton.MatchString(row) {
-			fail("has no pressed <button>Interested</button>")
+			fail("has no pressed <button>Following</button>")
 		}
-		for _, no := range []string{`value="interested"`, `aria-pressed="false"`} {
+		for _, no := range []string{`value="follow"`, `aria-pressed="false"`} {
 			if strings.Contains(row, no) {
 				fail("is marked but still has " + no)
 			}
 		}
 	} else {
-		for _, want := range []string{`value="interested"`, `aria-pressed="false"`} {
+		for _, want := range []string{`value="follow"`, `aria-pressed="false"`} {
 			if !strings.Contains(row, want) {
 				fail("is unmarked but lacks " + want)
 			}
 		}
 		if !unpressedRowButton.MatchString(row) {
-			fail("has no <button>I'm interested</button>")
+			fail("has no <button>Follow</button>")
 		}
 		for _, no := range []string{`value="clear"`, `aria-pressed="true"`} {
 			if strings.Contains(row, no) {
@@ -383,8 +385,8 @@ func assertRowToggle(t testing.TB, page, row, slug string, pressed bool) {
 	}
 }
 
-// spec: MarkInterested, ClearInterest, Home, UpcomingAll, MyEvents, PosterPage, Visitor
-func TestRows_InterestToggleOnEveryList(t *testing.T) {
+// spec: FollowEvent, UnfollowEvent, Home, UpcomingAll, MyEvents, PosterPage, Visitor
+func TestRows_FollowToggleOnEveryList(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	f.Title = uniqTitle(t, "Row")
 	f.Tags = []string{"exhibition"}
@@ -425,10 +427,10 @@ func TestRows_InterestToggleOnEveryList(t *testing.T) {
 	assertNotContains(t, alice.get("/mine"), `href="/e/`+slug+`"`)
 
 	// Pressing the row toggle posts back to the list it was on.
-	assertRedirect(t, setInterest(alice, slug, "interested", "/upcoming?tag=exhibition"), "/upcoming?tag=exhibition")
-	assertRedirect(t, setInterest(alice, slug, "interested", "/following"), "/following")
-	assertRedirect(t, setInterest(alice, slug, "interested", "/p/"+poster2.Slug), "/p/"+poster2.Slug)
-	assertRedirect(t, setInterest(alice, slug, "interested", "/"), "/")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/upcoming?tag=exhibition"), "/upcoming?tag=exhibition")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/following"), "/following")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/p/"+poster2.Slug), "/p/"+poster2.Slug)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/"), "/")
 
 	// Now every row of that event, on every list, is pressed.
 	for _, path := range append(pages, "/mine") {
@@ -460,20 +462,20 @@ func TestRows_InterestToggleOnEveryList(t *testing.T) {
 	}
 
 	// The pressed button posts value="clear": the row unpresses, /mine empties.
-	assertRedirect(t, setInterest(alice, slug, "clear", "/following"), "/following")
+	assertRedirect(t, setEventFollow(alice, slug, "clear", "/following"), "/following")
 	assertRowToggle(t, "/following", rowFor(alice.get("/following").Body, slug), slug, false)
 	assertRowToggle(t, "/upcoming", rowFor(alice.get("/upcoming").Body, slug), slug, false)
 	assertNotContains(t, alice.get("/mine"), `href="/e/`+slug+`"`)
 	assertNotContains(t, alice.get("/"), "<h2>Mine</h2>")
 }
 
-// spec: MyEvents, PosterPage, Event.is_upcoming, MarkInterested, UpcomingAll
+// spec: MyEvents, PosterPage, Event.is_upcoming, FollowEvent, UpcomingAll
 func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 	past := validEvent(t, yesterday())
 	past.Title = uniqTitle(t, "Was")
 	slug := createEvent(t, asPoster(t, poster2), past)
 	alice := newUser(t)
-	assertRedirect(t, setInterest(alice, slug, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/mine"), "/mine")
 
 	for name, r := range map[string]resp{"/mine": alice.get("/mine"), "/p/{slug}": alice.get("/p/" + poster2.Slug)} {
 		assertStatus(t, r, 200)
@@ -483,8 +485,8 @@ func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 			t.Errorf("%s: no row for the past event /e/%s\nbody: %s", name, slug, snippet(r.Body))
 			continue
 		}
-		if strings.Contains(row, "<form") || strings.Contains(row, "/interest") || strings.Contains(row, "aria-pressed") {
-			t.Errorf("%s: past row for /e/%s carries an interest toggle\nrow: %s", name, slug, snippet(row))
+		if strings.Contains(row, "<form") || strings.Contains(row, "/follow") || strings.Contains(row, "aria-pressed") {
+			t.Errorf("%s: past row for /e/%s carries a follow toggle\nrow: %s", name, slug, snippet(row))
 		}
 	}
 	// Past rows are never upcoming rows.
@@ -494,13 +496,13 @@ func TestRows_PastRowsHaveNoToggle(t *testing.T) {
 }
 
 var (
-	pressedInterested      = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Interested\s*</button>`)
-	pressedNotInterested   = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Not interested\s*</button>`)
-	unpressedInterested    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*I'm interested\s*</button>`)
-	unpressedNotInterested = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Not interested\s*</button>`)
+	pressedFollowing = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Following\s*</button>`)
+	pressedHidden    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="true"[^>]*>\s*Hidden\s*</button>`)
+	unpressedFollow  = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Follow\s*</button>`)
+	unpressedHide    = regexp.MustCompile(`(?s)<button[^>]*aria-pressed="false"[^>]*>\s*Hide\s*</button>`)
 )
 
-// spec: EventDetail, MarkInterested, MarkNotInterested, ClearInterest
+// spec: EventDetail, EventDetail.HiddenIsPrivate, FollowEvent, HideEvent, UnfollowEvent
 func TestEventPage_PressedButtonShowsCheck(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
@@ -519,19 +521,19 @@ func TestEventPage_PressedButtonShowsCheck(t *testing.T) {
 			t.Errorf("after %s: event page has %d pressed buttons", state, n)
 		}
 	}
-	check("clear", unpressedInterested, unpressedNotInterested)
+	check("clear", unpressedFollow, unpressedHide)
 
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
-	check("interested", pressedInterested, unpressedNotInterested)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
+	check("follow", pressedFollowing, unpressedHide)
 
-	assertRedirect(t, setInterest(alice, slug, "not_interested", page), page)
-	check("not_interested", pressedNotInterested, unpressedInterested)
+	assertRedirect(t, setEventFollow(alice, slug, "hide", page), page)
+	check("hide", pressedHidden, unpressedFollow)
 
-	assertRedirect(t, setInterest(alice, slug, "clear", page), page)
-	check("clear", unpressedInterested, unpressedNotInterested)
+	assertRedirect(t, setEventFollow(alice, slug, "clear", page), page)
+	check("clear", unpressedFollow, unpressedHide)
 
 	// The pressed state is alice's alone.
-	assertRedirect(t, setInterest(alice, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(alice, slug, "follow", page), page)
 	for name, c := range map[string]*client{"anon": anon(t), "bob": newUser(t)} {
 		r := c.get(page)
 		assertStatus(t, r, 200)

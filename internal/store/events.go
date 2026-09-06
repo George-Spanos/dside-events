@@ -14,7 +14,7 @@ type Link struct {
 }
 
 // Event is an event row joined with its poster, tags, links and the
-// interest counter (plus the viewer's own interest state when known).
+// follower counter (plus the viewer's own follow state when known).
 type Event struct {
 	ID          int64
 	Slug        string
@@ -30,8 +30,8 @@ type Event struct {
 	PosterName string
 	PosterSlug string
 
-	Interested  int      // number of accounts marked interested
-	ViewerState string   // "", "interested" or "not_interested"
+	Followers   int      // number of accounts following the event
+	ViewerState string   // "", "following" or "hidden"
 	Tags        []string // sorted
 	Links       []Link   // only populated by EventBySlug
 }
@@ -51,8 +51,8 @@ type EventInput struct {
 // anonymous) as the first argument.
 const eventSelect = `SELECT e.id, e.slug, e.title, e.starts_at, e.venue, e.price, e.description, e.created_at, e.updated_at,
   p.id, p.name, COALESCE(p.slug, ''),
-  (SELECT COUNT(*) FROM interests i WHERE i.event_id = e.id AND i.state = 'interested'),
-  COALESCE((SELECT i.state FROM interests i WHERE i.event_id = e.id AND i.account_id = ?), ''),
+  (SELECT COUNT(*) FROM follows_events f WHERE f.event_id = e.id AND f.state = 'following'),
+  COALESCE((SELECT f.state FROM follows_events f WHERE f.event_id = e.id AND f.account_id = ?), ''),
   COALESCE((SELECT GROUP_CONCAT(tag, ',') FROM (SELECT t.tag FROM event_tags t WHERE t.event_id = e.id ORDER BY t.tag)), '')
 FROM events e JOIN accounts p ON p.id = e.poster_id `
 
@@ -64,7 +64,7 @@ func scanEvents(rows *sql.Rows) ([]Event, error) {
 		var starts, created, updated int64
 		var tags string
 		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &starts, &e.Venue, &e.Price, &e.Description, &created, &updated,
-			&e.PosterID, &e.PosterName, &e.PosterSlug, &e.Interested, &e.ViewerState, &tags); err != nil {
+			&e.PosterID, &e.PosterName, &e.PosterSlug, &e.Followers, &e.ViewerState, &tags); err != nil {
 			return nil, err
 		}
 		e.StartsAt, e.CreatedAt, e.UpdatedAt = toTime(starts), toTime(created), toTime(updated)
@@ -113,7 +113,7 @@ func (s *Store) EventBySlug(ctx context.Context, slug string, viewerID int64) (*
 type FeedOpts struct {
 	From          time.Time // include events starting at or after this instant
 	Tag           string    // optional tag filter
-	ViewerID      int64     // 0 for anonymous; hides the viewer's not_interested events
+	ViewerID      int64     // 0 for anonymous; leaves out the viewer's hidden events
 	FollowingOnly bool      // only events from followed tags or followed posters
 	Limit         int       // at most this many rows; 0 means all
 }
@@ -121,7 +121,7 @@ type FeedOpts struct {
 // Feed lists upcoming events in chronological order.
 func (s *Store) Feed(ctx context.Context, o FeedOpts) ([]Event, error) {
 	where := `WHERE e.starts_at >= ?
-  AND NOT EXISTS (SELECT 1 FROM interests i WHERE i.event_id = e.id AND i.account_id = ? AND i.state = 'not_interested')`
+  AND NOT EXISTS (SELECT 1 FROM follows_events f WHERE f.event_id = e.id AND f.account_id = ? AND f.state = 'hidden')`
 	args := []any{o.ViewerID, o.From.Unix(), o.ViewerID}
 	if o.Tag != "" {
 		where += " AND EXISTS (SELECT 1 FROM event_tags t WHERE t.event_id = e.id AND t.tag = ?)"
@@ -140,15 +140,15 @@ func (s *Store) Feed(ctx context.Context, o FeedOpts) ([]Event, error) {
 	return s.queryEvents(ctx, where, args...)
 }
 
-// InterestedEvents lists the events the account marked interested.
-func (s *Store) InterestedEvents(ctx context.Context, accountID int64) ([]Event, error) {
-	return s.queryEvents(ctx, `JOIN interests v ON v.event_id = e.id AND v.account_id = ? AND v.state = 'interested'
+// FollowedEvents lists the events the account follows.
+func (s *Store) FollowedEvents(ctx context.Context, accountID int64) ([]Event, error) {
+	return s.queryEvents(ctx, `JOIN follows_events f ON f.event_id = e.id AND f.account_id = ? AND f.state = 'following'
   ORDER BY e.starts_at ASC, e.id ASC`, accountID, accountID)
 }
 
-// HiddenEvents lists the events the account marked not interested.
+// HiddenEvents lists the events the account hid.
 func (s *Store) HiddenEvents(ctx context.Context, accountID int64) ([]Event, error) {
-	return s.queryEvents(ctx, `JOIN interests v ON v.event_id = e.id AND v.account_id = ? AND v.state = 'not_interested'
+	return s.queryEvents(ctx, `JOIN follows_events f ON f.event_id = e.id AND f.account_id = ? AND f.state = 'hidden'
   ORDER BY e.starts_at ASC, e.id ASC`, accountID, accountID)
 }
 
@@ -232,7 +232,7 @@ func writeTagsAndLinks(ctx context.Context, tx *sql.Tx, id int64, in EventInput)
 	return nil
 }
 
-// DeleteEvent removes an event; interests, tags and links cascade. The slug
+// DeleteEvent removes an event; follows, tags and links cascade. The slug
 // is retired so no later event can take it.
 func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)

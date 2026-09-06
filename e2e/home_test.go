@@ -150,15 +150,15 @@ func TestHome_MineColumn_AbsentForAnonAndUnmarked(t *testing.T) {
 	}
 }
 
-// spec: Home, Home.SideBySide, MarkInterested, ClearInterest, MarkNotInterested, MyEvents
-func TestHome_MineColumn_ShowsMarkedUpcoming(t *testing.T) {
+// spec: Home, Home.SideBySide, FollowEvent, UnfollowEvent, HideEvent, MyEvents
+func TestHome_MineColumn_ShowsFollowedUpcoming(t *testing.T) {
 	f := validEvent(t, tomorrow())
-	f.Title = uniqTitle(t, "Marked")
+	f.Title = uniqTitle(t, "Followed")
 	slug := createEvent(t, asPoster(t, poster1), f)
 	alice := newUser(t)
 
 	// A row toggle posts back to the list it was pressed on.
-	assertRedirect(t, setInterest(alice, slug, "interested", "/"), "/")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/"), "/")
 
 	r := alice.get("/")
 	assertStatus(t, r, 200)
@@ -185,17 +185,17 @@ func TestHome_MineColumn_ShowsMarkedUpcoming(t *testing.T) {
 	}
 	// Both sections stand on one screen.
 	assertContains(t, r, `<a href="/upcoming">`+linkAllUpcoming+`</a>`)
-	// Every row of the marked event on the home page is pressed (it may
+	// Every row of the followed event on the home page is pressed (it may
 	// also sit in the Upcoming column).
 	for _, row := range rowsFor(r.Body, slug) {
 		assertRowToggle(t, "home", row, slug, true)
 	}
-	// Alice's mark is hers alone.
+	// Alice's follow is hers alone.
 	assertNotContains(t, anon(t).get("/"), headingMine)
 	assertNotContains(t, newUser(t).get("/"), headingMine)
 
 	// Clearing empties the column and it goes away.
-	assertRedirect(t, setInterest(alice, slug, "clear", "/"), "/")
+	assertRedirect(t, setEventFollow(alice, slug, "clear", "/"), "/")
 	r = alice.get("/")
 	assertStatus(t, r, 200)
 	assertNotContains(t, r, headingMine)
@@ -203,20 +203,20 @@ func TestHome_MineColumn_ShowsMarkedUpcoming(t *testing.T) {
 	assertNotContains(t, r, linkAllMine)
 
 	// A hidden event is not "mine" either.
-	assertRedirect(t, setInterest(alice, slug, "not_interested", "/"), "/")
+	assertRedirect(t, setEventFollow(alice, slug, "hide", "/"), "/")
 	r = alice.get("/")
 	assertStatus(t, r, 200)
 	assertNotContains(t, r, headingMine)
 	assertNotContains(t, r, f.Title)
 }
 
-// spec: Home, MyEvents, Event.is_upcoming, MarkInterested
-func TestHome_MineColumn_AbsentWhenOnlyPastMarked(t *testing.T) {
+// spec: Home, MyEvents, Event.is_upcoming, FollowEvent
+func TestHome_MineColumn_AbsentWhenOnlyPastFollowed(t *testing.T) {
 	past := validEvent(t, yesterday())
 	past.Title = uniqTitle(t, "Gone By")
 	slug := createEvent(t, asPoster(t, poster1), past)
 	alice := newUser(t)
-	assertRedirect(t, setInterest(alice, slug, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, slug, "follow", "/mine"), "/mine")
 
 	r := alice.get("/mine")
 	assertStatus(t, r, 200)
@@ -235,7 +235,7 @@ func TestHome_MineColumn_AbsentWhenOnlyPastMarked(t *testing.T) {
 func TestHome_WideBodyOnlyOnHome(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	u := newUser(t)
-	assertRedirect(t, setInterest(u, slug, "interested", "/"), "/")
+	assertRedirect(t, setEventFollow(u, slug, "follow", "/"), "/")
 
 	for _, path := range []string{"/", "/?tag=concert"} {
 		r := u.get(path)
@@ -382,7 +382,7 @@ func TestUpcoming_DayHeadings_WeekdayBold(t *testing.T) {
 		}
 	}
 	alice := newUser(t)
-	assertRedirect(t, setInterest(alice, createEvent(t, p, validEvent(t, tomorrow())), "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(alice, createEvent(t, p, validEvent(t, tomorrow())), "follow", "/mine"), "/mine")
 	r = alice.get("/mine")
 	if len(dayHeading.FindAllString(r.Body, -1)) == 0 {
 		t.Errorf(`/mine has no <h3 class="day"> heading`)

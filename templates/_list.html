@@ -11,12 +11,12 @@
         <span>{{range $i, $t := .Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}</span>
         <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
         <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
-        <span>{{.Interested}} interested</span>
+        <span>{{.Followers}} following</span>
       </small>
     </div>
-    {{if .Back}}<form method="post" action="/e/{{.Slug}}/interest" data-toggle class="row-toggle">
+    {{if .Back}}<form method="post" action="/e/{{.Slug}}/follow" data-toggle class="row-toggle">
       <input type="hidden" name="back" value="{{.Back}}">
-      <button name="state" value="{{if .Marked}}clear{{else}}interested{{end}}" aria-pressed="{{if .Marked}}true{{else}}false{{end}}" data-on="Interested" data-off="I'm interested">{{if .Marked}}Interested{{else}}I'm interested{{end}}</button>
+      <button name="state" value="{{if .Following}}clear{{else}}follow{{end}}" aria-pressed="{{if .Following}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if .Following}}Following{{else}}Follow{{end}}</button>
     </form>{{end}}
   </li>
   {{end}}
@@ -27,7 +27,7 @@
 {{define "pastlist"}}
 <ul class="past">
   {{range .}}
-  <li><a href="/e/{{.Slug}}">{{.Title}}</a> <small>· <time datetime="{{iso .Start}}">{{day .Start}}</time> · {{.Venue}}{{if .Interested}} · {{.Interested}} were interested{{end}}</small></li>
+  <li><a href="/e/{{.Slug}}">{{.Title}}</a> <small>· <time datetime="{{iso .Start}}">{{day .Start}}</time> · {{.Venue}}{{if .Followers}} · {{.Followers}} followed{{end}}</small></li>
   {{end}}
 </ul>
 {{end}}

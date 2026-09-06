@@ -7,15 +7,17 @@ import (
 )
 
 const (
-	copyLinkBroken   = "This link doesn't work. It may have been replaced with a new one."
-	copyMineEmpty    = "Nothing here yet. Press Interested on an event and it shows up here."
-	copyAccountNone  = "This device has no list yet. Press Interested on an event, or follow a tag or a curator, and your account starts here. No sign-up, no email."
-	copyAccountAgain = "Opened a secret link before? Open it again on this device to continue there."
-	copyFollowEmpty  = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
+	copyLinkBroken    = "This link doesn't work. It may have been replaced with a new one."
+	copyMineEmpty     = "Nothing here yet. Follow an event and it shows up here."
+	copyMineHidden    = "Events you hid. They stay out of your feed."
+	copyAccountNone   = "This device has no list yet. Follow an event, a tag or a curator, and your account starts here. No sign-up, no email."
+	copyAccountDelete = "Deletes your account, your follows and your hidden events. It can't be undone."
+	copyAccountAgain  = "Opened a secret link before? Open it again on this device to continue there."
+	copyFollowEmpty   = "You're not following anything yet. Pick a tag above and press Follow, or follow a curator from an event page."
 )
 
-// spec: StartAccount, Visitor, Account, Session, session_duration, MarkInterested, EventDetail, MyEvents
-func TestStartAccount_InterestFromAnonCreatesAccount(t *testing.T) {
+// spec: StartAccount, Visitor, Account, Session, session_duration, FollowEvent, EventDetail, MyEvents
+func TestStartAccount_FollowEventFromAnonCreatesAccount(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
@@ -31,24 +33,24 @@ func TestStartAccount_InterestFromAnonCreatesAccount(t *testing.T) {
 		t.Fatalf("GET %s set a session cookie", page)
 	}
 
-	// The first Interested starts the account and performs the action.
-	r = setInterest(v, slug, "interested", page)
+	// The first Follow starts the account and performs the action.
+	r = setEventFollow(v, slug, "follow", page)
 	assertRedirect(t, r, page)
 	assertSessionCookieFlags(t, r)
 	if v.cookie("session") == nil {
-		t.Fatalf("no session cookie in jar after the first interest POST")
+		t.Fatalf("no session cookie in jar after the first follow POST")
 	}
 
 	r = v.get("/mine")
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
 	assertNoCopy(t, r, copyMineEmpty)
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("public counter = %d, want 1", n)
 	}
 	// The next POST reuses the account: the cookie is not replaced.
 	old := v.cookie("session").Value
-	r = setInterest(v, slug, "interested", page)
+	r = setEventFollow(v, slug, "follow", page)
 	assertRedirect(t, r, page)
 	if sessionSetCookie(r) != "" {
 		t.Errorf("a POST with a valid session re-issued the cookie: %q", sessionSetCookie(r))
@@ -56,7 +58,7 @@ func TestStartAccount_InterestFromAnonCreatesAccount(t *testing.T) {
 	if v.cookie("session").Value != old {
 		t.Errorf("session cookie changed between two POSTs of the same visitor")
 	}
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter after the second mark = %d, want 1 (same account)", n)
 	}
 }
@@ -98,12 +100,12 @@ func TestStartAccount_DifferentVisitorsGetDifferentAccounts(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	page := "/e/" + slug
 	a, b := anon(t), anon(t)
-	assertRedirect(t, setInterest(a, slug, "interested", page), page)
-	assertRedirect(t, setInterest(b, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(a, slug, "follow", page), page)
+	assertRedirect(t, setEventFollow(b, slug, "follow", page), page)
 	if a.cookie("session").Value == b.cookie("session").Value {
 		t.Fatalf("two visitors share one session token")
 	}
-	if n := interestedCount(t, anon(t).get(page).Body); n != 2 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 2 {
 		t.Errorf("counter = %d, want 2 (two accounts)", n)
 	}
 	_, ka := secretLink(t, a)
@@ -196,7 +198,7 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 	page := "/e/" + slug
 
 	phone := newUser(t)
-	assertRedirect(t, setInterest(phone, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(phone, slug, "follow", page), page)
 	assertRedirect(t, follow(phone, "tag", "film", "1", "/account"), "/account")
 	link, _ := secretLink(t, phone)
 
@@ -214,13 +216,13 @@ func TestOpenSecretLink_SameListOnAnotherDevice(t *testing.T) {
 		t.Errorf("laptop sees link %q, phone %q; want the same account", link2, link)
 	}
 	// Same account, not a copy: the counter still says one.
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter = %d after opening the link, want 1", n)
 	}
 	// Both devices stay live and see each other's changes.
 	g := validEvent(t, tomorrow())
 	slug2 := createEvent(t, asPoster(t, poster1), g)
-	assertRedirect(t, setInterest(laptop, slug2, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(laptop, slug2, "follow", "/mine"), "/mine")
 	assertContains(t, phone.get("/mine"), g.Title)
 	assertContains(t, phone.get("/mine"), f.Title)
 
@@ -273,11 +275,11 @@ func TestOpenSecretLink_SwitchesAccount(t *testing.T) {
 	slugA, slugB := createEvent(t, p, fa), createEvent(t, p, fb)
 
 	a := newUser(t)
-	assertRedirect(t, setInterest(a, slugA, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(a, slugA, "follow", "/mine"), "/mine")
 	linkA, _ := secretLink(t, a)
 
 	b := newUser(t)
-	assertRedirect(t, setInterest(b, slugB, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(b, slugB, "follow", "/mine"), "/mine")
 	linkB, _ := secretLink(t, b)
 	oldB := b.cookie("session").Value
 
@@ -308,7 +310,7 @@ func TestRotateSecretLink_OldLinkDies_SessionsSurvive(t *testing.T) {
 	f := validEvent(t, tomorrow())
 	slug := createEvent(t, asPoster(t, poster1), f)
 	u := newUser(t)
-	assertRedirect(t, setInterest(u, slug, "interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(u, slug, "follow", "/mine"), "/mine")
 	oldLink, oldKey := secretLink(t, u)
 	other := openLink(t, shared, oldLink) // a second device on the same account
 
@@ -351,7 +353,7 @@ func TestForgetDevice_ClearsCookie_KeepsAccount(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), f)
 	page := "/e/" + slug
 	u := newUser(t)
-	assertRedirect(t, setInterest(u, slug, "interested", page), page)
+	assertRedirect(t, setEventFollow(u, slug, "follow", page), page)
 	assertRedirect(t, follow(u, "tag", "film", "1", "/account"), "/account")
 	link, _ := secretLink(t, u)
 	old := u.cookie("session")
@@ -383,19 +385,19 @@ func TestForgetDevice_ClearsCookie_KeepsAccount(t *testing.T) {
 	assertNotContains(t, replay.get("/mine"), f.Title)
 
 	// The account and its data stay: the counter holds and the link restores it.
-	if n := interestedCount(t, anon(t).get(page).Body); n != 1 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 1 {
 		t.Errorf("counter after /forget = %d, want 1 (account kept)", n)
 	}
 	again := openLink(t, shared, link)
 	r = again.get("/mine")
 	assertContains(t, r, f.Title)
 	assertForm(t, again.get("/account"), `action="/follow"`, `value="tag"`, `value="film"`, `value="0"`)
-	// A forgotten device that presses Interested starts a brand-new account.
-	assertRedirect(t, setInterest(u, slug, "interested", page), page)
+	// A forgotten device that presses Follow starts a brand-new account.
+	assertRedirect(t, setEventFollow(u, slug, "follow", page), page)
 	if l, _ := secretLink(t, u); l == link {
 		t.Errorf("a forgotten device got the old account back without the link")
 	}
-	if n := interestedCount(t, anon(t).get(page).Body); n != 2 {
+	if n := followerCount(t, anon(t).get(page).Body); n != 2 {
 		t.Errorf("counter = %d, want 2 (old account + new one)", n)
 	}
 	assertStatus(t, again.get("/forget"), 405)

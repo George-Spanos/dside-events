@@ -49,7 +49,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /e/{slug}/edit", h(s.editForm))
 	mux.HandleFunc("POST /e/{slug}/edit", h(s.editSubmit))
 	mux.HandleFunc("POST /e/{slug}/delete", h(s.deleteEvent))
-	mux.HandleFunc("POST /e/{slug}/interest", h(s.interest))
+	mux.HandleFunc("POST /e/{slug}/follow", h(s.followEvent))
 	mux.HandleFunc("GET /p/{slug}", h(s.poster))
 	mux.HandleFunc("POST /follow", h(s.follow))
 	mux.HandleFunc("GET /new", h(s.newForm))

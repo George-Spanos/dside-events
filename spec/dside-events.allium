@@ -1,8 +1,8 @@
 -- allium: 3
 -- dside-events: event discovery for Athens. Text-only events posted by
 -- whitelisted curators ("posters"); attendees hold anonymous accounts that
--- start in a cookie on their first Interested or Follow and travel to another
--- device through a secret link. No email, no sign-up. Anonymous visitors browse.
+-- start in a cookie on their first Follow (event, tag or curator) and travel
+-- to another device through a secret link. No email, no sign-up. Anonymous visitors browse.
 -- Source of truth for product intent: PROJECT.md.
 
 ------------------------------------------------------------
@@ -32,7 +32,10 @@ value Link {
 
 enum Role { user | poster }
 
-enum InterestState { interested | not_interested }
+-- 2026-09-06: the founder renamed the event action from "interested" /
+-- "not interested" to "follow" / "hide"; this enum was InterestState
+-- { interested | not_interested } and the entity below was Interest.
+enum FollowState { following | hidden }
 
 enum Tag { concert | theater | film | exhibition }
 
@@ -57,14 +60,14 @@ entity Account {
     -- Relationships
     sessions: Session with account = this
     events: Event with poster = this
-    interests: Interest with account = this
+    event_follows: EventFollow with account = this
     tag_follows: TagFollow with follower = this
     poster_follows: PosterFollow with follower = this
 
     -- Projections
     active_sessions: sessions where status = active
-    interested_events: interests where state = interested -> event
-    hidden_events: interests where state = not_interested -> event
+    followed_events: event_follows where state = following -> event
+    hidden_events: event_follows where state = hidden -> event
 
     -- Derived
     is_poster: role = poster
@@ -98,13 +101,13 @@ entity Event {
     updated_at: Timestamp
 
     -- Relationships
-    interests: Interest with event = this
+    follows: EventFollow with event = this
 
     -- Projections
-    interested_by: interests where state = interested
+    followed_by: follows where state = following
 
     -- Derived
-    interested_count: interested_by.count
+    follower_count: followed_by.count
     is_upcoming: starts_at >= athens_day_start(now)    -- black box: midnight in Europe/Athens of the current day
 
     invariant PostedByPoster {
@@ -112,11 +115,11 @@ entity Event {
     }
 }
 
-entity Interest {
+entity EventFollow {
     -- Fields
     account: Account
     event: Event
-    state: InterestState
+    state: FollowState
     updated_at: Timestamp
 }
 
@@ -142,7 +145,7 @@ config {
     session_duration: Duration = 365.days
     key_length: Integer = 32                -- random bytes in a secret key
     max_tags: Integer = 4
-    max_links: Integer = 5
+    max_links: Integer = 3
     max_title_length: Integer = 120
     max_description_length: Integer = 4000
     max_venue_length: Integer = 120
@@ -160,9 +163,9 @@ config {
 
 -- Accounts and sessions -----------------------------------
 
--- An account starts on the visitor's first Interested, Not interested or
--- Follow. The surfaces that offer those actions to a visitor without a
--- session offer StartAccount alongside them; the implementation performs
+-- An account starts on the visitor's first Follow (event, tag or curator)
+-- or first Hide. The surfaces that offer those actions to a visitor without
+-- a session offer StartAccount alongside them; the implementation performs
 -- both in the same request.
 rule StartAccount {
     when: StartAccount(visitor)
@@ -181,9 +184,9 @@ rule StartAccount {
         )
         SessionIssued(visitor: visitor, session: session)
     @guidance
-        -- HTTP: fired by POST /e/{slug}/interest and POST /follow when the
-        -- request carries no valid session cookie; the interest or follow rule
-        -- then applies to the new account in the same request, and the
+        -- HTTP: fired by POST /e/{slug}/follow and POST /follow when the
+        -- request carries no valid session cookie; the event-follow or follow
+        -- rule then applies to the new account in the same request, and the
         -- response is the same 303 an existing account gets. SessionIssued is
         -- the Set-Cookie: session cookie, HttpOnly, SameSite=Lax, Path=/,
         -- Secure when configured, config.session_duration long. No other
@@ -308,7 +311,7 @@ rule CreateEvent {
     @guidance
         -- HTTP: GET/POST /new for posters only; a user or an anonymous visitor
         -- gets 403. Form fields title, date, time, venue, price, tag
-        -- (repeated), link_label_1..5, link_url_1..5, description; date and
+        -- (repeated), link_label_1..3, link_url_1..3, description; date and
         -- time are read in Europe/Athens. A link without label defaults its
         -- label to the URL host. Success 303 to /e/{slug}; any failed
         -- requirement 422 re-rendering the form with the submitted values, the
@@ -351,58 +354,60 @@ rule DeleteEvent {
     when: DeleteEvent(poster, event)
     requires: event.poster = poster
     ensures:
-        for i in event.interests:
-            not exists i
+        for f in event.follows:
+            not exists f
         not exists event
     @guidance
         -- HTTP: POST /e/{slug}/delete, owner only (403 otherwise), 303 to /.
         -- Hard delete: the slug answers 404 afterwards and is never reused.
 }
 
--- Interest ------------------------------------------------
+-- Event follows ------------------------------------------
 
-rule MarkInterested {
-    when: MarkInterested(account, event)
-    let existing = Interest{account, event}
+rule FollowEvent {
+    when: FollowEvent(account, event)
+    let existing = EventFollow{account, event}
     ensures:
         if exists existing:
-            existing.state = interested
+            existing.state = following
             existing.updated_at = now
         else:
-            Interest.created(account: account, event: event, state: interested, updated_at: now)
+            EventFollow.created(account: account, event: event, state: following, updated_at: now)
     @guidance
-        -- HTTP: POST /e/{slug}/interest with state=interested and back; 303 to
-        -- back when it is a local path, otherwise to /e/{slug}. Idempotent.
-        -- Without a session StartAccount runs first in the same request. The
-        -- interested count on an event is public.
+        -- HTTP: POST /e/{slug}/follow with state=follow and back; 303 to back
+        -- when it is a local path, otherwise to /e/{slug}. Idempotent. Without
+        -- a session StartAccount runs first in the same request. The follower
+        -- count on an event is public.
 }
 
-rule MarkNotInterested {
-    when: MarkNotInterested(account, event)
-    let existing = Interest{account, event}
+rule HideEvent {
+    when: HideEvent(account, event)
+    let existing = EventFollow{account, event}
     ensures:
         if exists existing:
-            existing.state = not_interested
+            existing.state = hidden
             existing.updated_at = now
         else:
-            Interest.created(account: account, event: event, state: not_interested, updated_at: now)
+            EventFollow.created(account: account, event: event, state: hidden, updated_at: now)
     @guidance
-        -- HTTP: same endpoint with state=not_interested; without a session
-        -- StartAccount runs first. Never expose a not_interested mark to anyone
-        -- but the owning account: not to other users, not to the poster, and
-        -- never in the public count.
+        -- HTTP: same endpoint with state=hide; without a session StartAccount
+        -- runs first. Never expose a hidden state to anyone but the owning
+        -- account: not to other users, not to the poster, and never in the
+        -- public count.
 }
 
-rule ClearInterest {
-    when: ClearInterest(account, event)
-    let existing = Interest{account, event}
+rule UnfollowEvent {
+    when: UnfollowEvent(account, event)
+    let existing = EventFollow{account, event}
     ensures: not exists existing
     @guidance
-        -- HTTP: same endpoint with state=clear. Any other state value answers
-        -- 400; an unknown slug 404. Clearing when nothing is marked is a no-op.
+        -- HTTP: same endpoint with state=clear. Removes the EventFollow
+        -- whatever its state, so it both unfollows a followed event and shows a
+        -- hidden one again. Any other state value answers 400; an unknown slug
+        -- 404. Clearing when nothing is set is a no-op.
 }
 
--- Following -----------------------------------------------
+-- Following tags and curators -----------------------------
 
 rule FollowTag {
     when: FollowTag(account, tag)
@@ -469,8 +474,8 @@ rule DeleteAccount {
     ensures:
         for s in account.sessions:
             not exists s
-        for i in account.interests:
-            not exists i
+        for f in account.event_follows:
+            not exists f
         for f in account.tag_follows:
             not exists f
         for f in account.poster_follows:
@@ -480,9 +485,9 @@ rule DeleteAccount {
         -- HTTP: POST /account/delete requires confirm=1 (otherwise 422); a
         -- poster gets 403 with "Curator accounts are removed by hand"; success
         -- clears the cookie and 303 to /. Without a session the request
-        -- answers 303 to /account. Interested counts on events drop
-        -- accordingly. The next Interested or Follow from that browser starts
-        -- a fresh, unrelated account.
+        -- answers 303 to /account. Follower counts on events drop
+        -- accordingly. The next Follow from that browser starts a fresh,
+        -- unrelated account.
 }
 
 ------------------------------------------------------------
@@ -507,9 +512,9 @@ invariant SlugsUnique {
             a != b implies a.slug != b.slug
 }
 
-invariant OneInterestPerAccountEvent {
-    for a in Interests:
-        for b in Interests:
+invariant OneFollowPerAccountEvent {
+    for a in EventFollows:
+        for b in EventFollows:
             a != b implies not (a.account = b.account and a.event = b.event)
 }
 
@@ -538,15 +543,15 @@ surface Home {
 
     let account = visitor.session?.account                   -- absent without a session
     let upcoming = Events where is_upcoming
-    -- Upcoming events minus the ones this account marked not_interested;
-    -- without an account nothing is hidden.
-    let visible = upcoming where not interests.any(i => i.account = account and i.state = not_interested)
+    -- Upcoming events minus the ones this account hid; without an account
+    -- nothing is hidden.
+    let visible = upcoming where not follows.any(f => f.account = account and f.state = hidden)
     -- The next config.home_list_size of them, soonest first. A tag filter
     -- narrows visible before the cut (see FilterableByTag on UpcomingAll).
     let upcoming_next = first_n(visible, config.home_list_size)      -- black box: the first n in ascending starts_at
-    -- The visitor's upcoming interested events, soonest first, at most
+    -- The visitor's upcoming followed events, soonest first, at most
     -- config.home_list_size; empty without a session.
-    let mine_next = first_n(upcoming where interests.any(i => i.account = account and i.state = interested), config.home_list_size)
+    let mine_next = first_n(upcoming where follows.any(f => f.account = account and f.state = following), config.home_list_size)
 
     exposes:
         for e in upcoming_next:
@@ -555,7 +560,7 @@ surface Home {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -565,7 +570,7 @@ surface Home {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -575,12 +580,12 @@ surface Home {
         FollowTag(account, tag) when account != null
         UnfollowTag(account, tag) when account != null
         for e in upcoming_next:
-            MarkInterested(account, e)
-                when account != null and not e.interests.any(i => i.account = account and i.state = interested)
-            ClearInterest(account, e)
-                when account != null and e.interests.any(i => i.account = account and i.state = interested)
+            FollowEvent(account, e)
+                when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            UnfollowEvent(account, e)
+                when account != null and e.follows.any(f => f.account = account and f.state = following)
         for e in mine_next:
-            ClearInterest(account, e)                        -- every row of Mine is marked interested by construction
+            UnfollowEvent(account, e)                        -- every row of Mine is followed by construction
 
     related:
         for e in upcoming_next:
@@ -599,7 +604,7 @@ surface Home {
     @guarantee SideBySide
         -- Mine and Upcoming are two columns of one screen, Mine first. Mine
         -- appears only when the visitor has a session and at least one
-        -- upcoming interested event; otherwise the screen is Upcoming alone.
+        -- upcoming followed event; otherwise the screen is Upcoming alone.
     @guidance
         -- HTTP: GET / and GET /?tag={tag}, 200 with or without a session;
         -- unknown tag 404. The filters row (all · following · one link per
@@ -613,12 +618,14 @@ surface Home {
         -- events →" to /upcoming (carrying ?tag= when filtered); that link is
         -- shown even when the list is empty, under the usual empty copy. The
         -- columns sit side by side when the screen has room and stack, Mine
-        -- first, when it does not. Every row carries the Interested toggle,
-        -- labelled "I'm interested" until pressed, then "Interested" with a check mark drawn by the stylesheet (aria-pressed) when the account is
-        -- interested; a press without a session fires StartAccount and then
-        -- MarkInterested in the same request. Days are visibly separated. The
-        -- interested count is always shown, zero included (the founder fixed
-        -- the row as five lines). Filters are plain text links. Pages are served with Cache-Control: no-store.
+        -- first, when it does not. Every row carries the Follow toggle,
+        -- labelled "Follow" until pressed, then "Following" with a check mark
+        -- drawn by the stylesheet (aria-pressed) when the account follows the
+        -- event; a press without a session fires StartAccount and then
+        -- FollowEvent in the same request. Days are visibly separated. The
+        -- follower count is always shown as "{n} following", zero included
+        -- (the founder fixed the row as five lines). Filters are plain text
+        -- links. Pages are served with Cache-Control: no-store.
 
 }
 
@@ -627,9 +634,9 @@ surface UpcomingAll {
 
     let account = visitor.session?.account                   -- absent without a session
     let upcoming = Events where is_upcoming
-    -- Upcoming events minus the ones this account marked not_interested;
-    -- without an account nothing is hidden.
-    let visible = upcoming where not interests.any(i => i.account = account and i.state = not_interested)
+    -- Upcoming events minus the ones this account hid; without an account
+    -- nothing is hidden.
+    let visible = upcoming where not follows.any(f => f.account = account and f.state = hidden)
     -- The following view: visible events that carry a followed tag or come
     -- from a followed poster; empty without an account.
     let following = visible where TagFollows.any(f => f.follower = account and f.tag in tags)
@@ -642,7 +649,7 @@ surface UpcomingAll {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -652,7 +659,7 @@ surface UpcomingAll {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -661,13 +668,13 @@ surface UpcomingAll {
         StartAccount(visitor) when visitor.session = null
         FollowTag(account, tag) when account != null
         UnfollowTag(account, tag) when account != null
-        -- Every row carries the Interested toggle; following is a subset of
+        -- Every row carries the Follow toggle; following is a subset of
         -- visible, so its rows are covered here.
         for e in visible:
-            MarkInterested(account, e)
-                when account != null and not e.interests.any(i => i.account = account and i.state = interested)
-            ClearInterest(account, e)
-                when account != null and e.interests.any(i => i.account = account and i.state = interested)
+            FollowEvent(account, e)
+                when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            UnfollowEvent(account, e)
+                when account != null and e.follows.any(f => f.account = account and f.state = following)
 
     related:
         for e in visible:
@@ -681,8 +688,8 @@ surface UpcomingAll {
         -- The feed can be narrowed to events carrying one tag from the Tag
         -- enumeration. A tag outside the enumeration is not a feed at all.
     @guarantee HiddenStaysHidden
-        -- An event the account marked not_interested appears in neither list
-        -- until the mark is cleared; nobody else can tell it was hidden.
+        -- An event the account hid appears in neither list until the hide is
+        -- cleared; nobody else can tell it was hidden.
     @guarantee FollowingIsUnion
         -- The following view uses OR semantics: a followed tag or a followed
         -- poster is enough for an event to appear.
@@ -698,10 +705,10 @@ surface UpcomingAll {
         -- follow or unfollow toggle for that tag sits under the filter links;
         -- a follow posted without a session fires StartAccount and then
         -- FollowTag in the same request. Events are grouped by Athens day in
-        -- ascending start order; the interested count is always shown, zero
-        -- included. Every row carries the Interested toggle, pressed when the
-        -- account is interested; a press without a session fires StartAccount
-        -- and then MarkInterested in the same request. This is the whole list
+        -- ascending start order; the follower count is always shown, zero
+        -- included. Every row carries the Follow toggle, pressed when the
+        -- account follows the event; a press without a session fires
+        -- StartAccount and then FollowEvent in the same request. This is the whole list
         -- Home links to: no row limit, no pagination. Filters are plain text
         -- links. Pages are served with Cache-Control: no-store.
 
@@ -713,7 +720,7 @@ surface EventDetail {
     context event: Event
 
     let account = visitor.session?.account                   -- absent without a session
-    let mine = Interest{account: account, event: event}      -- absent without a session or a mark
+    let mine = EventFollow{account: account, event: event}   -- absent without a session or a follow
 
     exposes:
         event.slug
@@ -726,18 +733,18 @@ surface EventDetail {
         event.description
         event.poster.name
         event.poster.slug
-        event.interested_count
+        event.follower_count
         event.is_upcoming
         mine.state when exists mine
 
     provides:
         StartAccount(visitor)
             when visitor.session = null and event.is_upcoming
-        MarkInterested(account, event)
-            when account != null and event.is_upcoming and (not exists mine or mine.state = not_interested)
-        MarkNotInterested(account, event)
-            when account != null and event.is_upcoming and (not exists mine or mine.state = interested)
-        ClearInterest(account, event)
+        FollowEvent(account, event)
+            when account != null and event.is_upcoming and (not exists mine or mine.state = hidden)
+        HideEvent(account, event)
+            when account != null and event.is_upcoming and (not exists mine or mine.state = following)
+        UnfollowEvent(account, event)
             when account != null and exists mine and event.is_upcoming
         DeleteEvent(account, event)
             when event.poster = account
@@ -752,17 +759,21 @@ surface EventDetail {
     @guarantee PosterIsPublic
         -- Every event page names the curator who posted it and links to
         -- their page; the name is the trust signal.
-    @guarantee NotInterestedIsPrivate
-        -- The not_interested state is shown only to the account that set it,
-        -- as "Hidden from your feed." with a clear action; the public count
+    @guarantee HiddenIsPrivate
+        -- The hidden state is shown only to the account that set it, as
+        -- "Hidden from your feed." with a clear action; the public count
         -- never includes it.
     @guidance
         -- HTTP: GET /e/{slug}; unknown slug 404. The page is identical with
-        -- and without a session: two toggle buttons (interested, not
-        -- interested) post to /e/{slug}/interest with a hidden back field, and
-        -- the count reads "Nobody yet interested" at zero. A press without a
-        -- session fires StartAccount and then the interest rule in the same
-        -- request. A past event shows "This event has passed." and no buttons.
+        -- and without a session: two toggle buttons post to /e/{slug}/follow
+        -- with a hidden back field: one labelled "Follow" until pressed, then
+        -- "Following" (state=follow, pressed state=clear), one labelled "Hide"
+        -- until pressed, then "Hidden" (state=hide, pressed state=clear); both
+        -- carry aria-pressed. The counter reads "{n} following", or "Nobody
+        -- following yet" at zero; on a past event "{n} followed" or "Nobody
+        -- followed". A press without a session fires StartAccount and then
+        -- the event-follow rule in the same request. A past event shows
+        -- "This event has passed." and no buttons.
         -- The owner sees an Edit link and a Delete form. Toggles are plain
         -- forms that work without script; script only replaces the form in
         -- place. Tags link to /?tag=, external links open the given URLs.
@@ -788,7 +799,7 @@ surface PosterPage {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -797,17 +808,17 @@ surface PosterPage {
             e.title
             e.starts_at
             e.venue
-            e.interested_count
+            e.follower_count
 
     provides:
         StartAccount(visitor) when visitor.session = null
         FollowPoster(account, curator) when account != null and not exists follow and curator != account
         UnfollowPoster(account, curator) when account != null and exists follow and curator != account
         for e in upcoming:
-            MarkInterested(account, e)
-                when account != null and not e.interests.any(i => i.account = account and i.state = interested)
-            ClearInterest(account, e)
-                when account != null and e.interests.any(i => i.account = account and i.state = interested)
+            FollowEvent(account, e)
+                when account != null and not e.follows.any(f => f.account = account and f.state = following)
+            UnfollowEvent(account, e)
+                when account != null and e.follows.any(f => f.account = account and f.state = following)
 
     related:
         for e in upcoming:
@@ -819,7 +830,8 @@ surface PosterPage {
     @guidance
         -- HTTP: GET /p/{slug}; a slug that is not a poster's answers 404.
         -- Upcoming ascending, then Past descending. Upcoming rows carry the
-        -- Interested toggle; past rows carry none. The follow or unfollow
+        -- Follow toggle; past rows carry none and read "{n} followed" when the
+        -- count is not zero. The follow or unfollow
         -- toggle posts to /follow with kind=poster and key=<slug>; a follow
         -- without a session fires StartAccount and then FollowPoster in the
         -- same request. A curator sees no follow toggle on their own page.
@@ -830,10 +842,10 @@ surface MyEvents {
     facing visitor: Visitor
 
     let account = visitor.session?.account                   -- absent without a session
-    let marked = Events where interests.any(i => i.account = account and i.state = interested)
-    let upcoming = marked where is_upcoming
-    let past = marked where not is_upcoming
-    let hidden = Events where interests.any(i => i.account = account and i.state = not_interested)
+    let followed = Events where follows.any(f => f.account = account and f.state = following)
+    let upcoming = followed where is_upcoming
+    let past = followed where not is_upcoming
+    let hidden = Events where follows.any(f => f.account = account and f.state = hidden)
 
     exposes:
         for e in upcoming:
@@ -842,7 +854,7 @@ surface MyEvents {
             e.starts_at
             e.venue
             e.price
-            e.interested_count
+            e.follower_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -851,7 +863,7 @@ surface MyEvents {
             e.title
             e.starts_at
             e.venue
-            e.interested_count
+            e.follower_count
         for e in hidden:
             e.slug
             e.title
@@ -859,15 +871,15 @@ surface MyEvents {
             e.venue
 
     provides:
-        -- The same row toggle as every list. Every row of Upcoming is marked
-        -- interested by construction, so only the clearing side is ever offered.
+        -- The same row toggle as every list. Every row of Upcoming is followed
+        -- by construction, so only the unfollowing side is ever offered.
         for e in upcoming:
-            MarkInterested(account, e)
-                when not e.interests.any(i => i.account = account and i.state = interested)
-            ClearInterest(account, e)
-                when e.interests.any(i => i.account = account and i.state = interested)
+            FollowEvent(account, e)
+                when not e.follows.any(f => f.account = account and f.state = following)
+            UnfollowEvent(account, e)
+                when e.follows.any(f => f.account = account and f.state = following)
         for e in hidden:
-            ClearInterest(account, e)
+            UnfollowEvent(account, e)
 
     related:
         for e in upcoming:
@@ -880,17 +892,18 @@ surface MyEvents {
 
     @guarantee UndoWithoutScript
         -- A hidden event can always be restored from this page with a plain
-        -- form post, so not_interested is never a dead end.
+        -- form post, so hiding is never a dead end.
     @guidance
         -- HTTP: GET /mine, 200 with or without a session, with sections
-        -- Upcoming (ascending), Past (descending) and Hidden (with a clear
-        -- button each); upcoming rows carry the Interested toggle, shown
-        -- pressed, and pressing it clears the mark; past rows carry none. The
-        -- Upcoming heading appears only when at least one event
-        -- is marked interested; the empty state "Nothing here yet. Press
-        -- Interested on an event and it shows up here." appears when the
-        -- account has no mark at all, neither interested nor hidden, and when
-        -- there is no session.
+        -- Upcoming (ascending), Past (descending) and Hidden; upcoming rows
+        -- carry the Follow toggle, shown pressed, and pressing it unfollows;
+        -- past rows carry none. Hidden carries the note "Events you hid. They
+        -- stay out of your feed." and a "Show again" button (state=clear) per
+        -- row. The Upcoming heading appears only when at least one upcoming
+        -- event is followed; the empty state "Nothing here yet. Follow an
+        -- event and it shows up here." appears when the account has no event
+        -- follow at all, neither following nor hidden, and when there is no
+        -- session.
 
 }
 
@@ -939,9 +952,9 @@ surface AccountPage {
         -- (see SecretLink).
     @guidance
         -- HTTP: GET /account, 200 in two states. Without a session: "This
-        -- device has no list yet. Press Interested on an event, or follow a
-        -- tag or a curator, and your account starts here. No sign-up, no
-        -- email." and "Opened a secret link before? Open it again on this
+        -- device has no list yet. Follow an event, a tag or a curator, and
+        -- your account starts here. No sign-up, no email." and "Opened a
+        -- secret link before? Open it again on this
         -- device to continue there." With a session: "Your secret link" as an
         -- absolute /k/{key} URL with "Open it on another device to see the
         -- same list there. Anyone with this link is you, so keep it to
@@ -950,7 +963,9 @@ surface AccountPage {
         -- yet followed and unfollow buttons next to followed tags and posters;
         -- "This device" with a "Forget this device" form ("Your list stays;
         -- the secret link brings it back."); and, for users, "Delete account"
-        -- with confirm=1. A poster sees a link to their own curator page and
+        -- with confirm=1 and the note "Deletes your account, your follows and
+        -- your hidden events. It can't be undone." A poster sees a link to
+        -- their own curator page and
         -- "Curator accounts are removed by hand. Ask us." instead of the
         -- delete form. Forget acts on the session carried by the request
         -- cookie.
@@ -1052,15 +1067,15 @@ surface PwaAssets {
 -- OQ-1 (tags) resolved by the founder on 2026-09-06: the fixed list is concert, theater,
 -- film, exhibition (narrowed to these four on 2026-09-06). No catch-all tag: better to miss a
 -- category than to have a bucket tag.
-open question "OQ-2 Event fields: title, start date+time, venue (required), price (optional text), plain-text description, 1-4 tags, up to 5 labelled http(s) links, no end time and no media? (default: yes)"
+open question "OQ-2 Event fields: title, start date+time, venue (required), price (optional text), plain-text description, 1-4 tags, up to 3 labelled http(s) links, no end time and no media? (default: yes)"
 open question "OQ-3 One post per event: is a duplicate defined as same poster + same normalised title + same Athens day, refused as already posted? (default: yes)"
 open question "OQ-4 Past start dates: may a poster create or edit an event that already started? (default: yes, within one year back and three years ahead, for backfill)"
-open question "OQ-5 Interest: is the interested count public, and is not_interested private to the account, hiding the event from feeds until cleared from the event page or the Hidden section of /mine? (default: yes to both)"
-open question "OQ-6 Delete account: is self-deletion limited to role user, cascading sessions, interests and follows, with curators removed by hand? (default: yes)"
-open question "OQ-7 Delete event: hard delete with cascade of interests and a slug that answers 404 forever? (default: yes)"
+open question "OQ-5 Follow and hide: is the follower count public, and is hidden private to the account, keeping the event out of feeds until cleared from the event page or the Hidden section of /mine? (default: yes to both)"
+open question "OQ-6 Delete account: is self-deletion limited to role user, cascading sessions, event follows and tag/curator follows, with curators removed by hand? (default: yes)"
+open question "OQ-7 Delete event: hard delete with cascade of event follows and a slug that answers 404 forever? (default: yes)"
 -- OQ-8 (one-time codes) withdrawn by the founder on 2026-09-06 together with the
 -- email-only account default: there is no email anywhere. Accounts are anonymous,
--- start in a cookie on the first Interested or Follow, and move between devices
+-- start in a cookie on the first Follow (event, tag or curator), and move between devices
 -- through a secret link; posters log in with the secret link the CLI prints.
 open question "OQ-9 Sessions: fixed 365-day lifetime without sliding renewal, carried in an HttpOnly SameSite=Lax cookie, with the secret link as the only way back after the cookie is lost? (default: yes)"
 -- OQ-10 (CSRF) resolved with its default: a same-site session cookie plus a
@@ -1072,7 +1087,7 @@ open question "OQ-12 Time: store instants in UTC and treat every calendar bounda
 -- the system by default AND a light/dark switch exists (rule ChooseTheme).
 open question "OQ-14 PWA icon: is a generated SVG/PNG icon the sole exception to no images? (default: yes)"
 open question "OQ-15 Packaging: single Go module dside.studio/events with SQLite as the only third-party dependency, deployed as a Docker image with a data volume? (default: yes)"
-open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their interest toggles)"
+open question "OQ-16 Upcoming boundary: does an event stay upcoming until the end of its Athens day, or only until its start time? (default: until the Athens day ends, so today's earlier events still show in the feed and keep their Follow toggles)"
 open question "OQ-17 Abuse: should cookieless POSTs creating accounts be rate-limited or should idle accounts be purged? (default: no, POC)"
-open question "OQ-19 Reaching /mine: since the nav lost its mine link, a visitor whose marks are all past or hidden has no link to /mine (Past, Hidden). Add one on /account? (default: yes, a plain link on the account page; not implemented until the founder agrees)"
+open question "OQ-19 Reaching /mine: since the nav lost its mine link, a visitor whose event follows are all past or hidden has no link to /mine (Past, Hidden). Add one on /account? (default: yes, a plain link on the account page; not implemented until the founder agrees)"
 open question "OQ-18 Key at rest: the secret key is stored in clear so the account page can show the link, which makes a copy of the database every login; acceptable for the POC, or should links be shown only once at creation and rotation with a hash at rest? (default: in clear, POC)"

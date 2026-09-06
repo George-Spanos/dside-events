@@ -9,11 +9,11 @@ BASE_URL ?= http://$(ADDR)
 PROD     := docker compose -f docker-compose.prod.yml
 CURATORS := "Katerina Spatharou" "George Spanos"
 
-# Overridable curator details for `make poster` / `make poster-link`.
+# Overridable curator details for `make poster`.
 NAME ?=
 SLUG ?=
 
-.PHONY: help build run poster poster-link test e2e check fmt vet docker-up docker-down docker-poster docker-poster-link prod-up prod-curators prod-poster-link clean
+.PHONY: help build run poster poster-links test e2e check fmt vet docker-up docker-down docker-poster docker-poster-links prod-up prod-curators prod-poster-links clean
 
 help: ## show this list
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -29,9 +29,8 @@ poster: build ## make a curator, prints their secret link: make poster NAME="Mar
 	@test -n "$(NAME)" || { echo 'usage: make poster NAME="Maria P." [SLUG=maria]'; exit 2; }
 	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) add-poster -name "$(NAME)" $(if $(SLUG),-slug "$(SLUG)")
 
-poster-link: build ## new secret link for a curator (the old one stops working): make poster-link SLUG=maria
-	@test -n "$(SLUG)" || { echo 'usage: make poster-link SLUG=maria'; exit 2; }
-	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) poster-link -slug "$(SLUG)"
+poster-links: build ## list every curator with their secret link (rotate one with: $(BIN) poster-link -slug x)
+	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) poster-links
 
 test: ## unit tests (store, slug)
 	go test . ./internal/...
@@ -57,9 +56,8 @@ docker-poster: ## curator inside docker: make docker-poster NAME="Maria P." [SLU
 	@test -n "$(NAME)" || { echo 'usage: make docker-poster NAME="Maria P." [SLUG=maria]'; exit 2; }
 	docker compose exec events /dside-events add-poster -name "$(NAME)" $(if $(SLUG),-slug "$(SLUG)")
 
-docker-poster-link: ## new curator link inside docker: make docker-poster-link SLUG=maria
-	@test -n "$(SLUG)" || { echo 'usage: make docker-poster-link SLUG=maria'; exit 2; }
-	docker compose exec events /dside-events poster-link -slug "$(SLUG)"
+docker-poster-links: ## list every curator with their secret link inside docker
+	docker compose exec events /dside-events poster-links
 
 prod-up: ## start production from the published image (set BASE_URL to the public address)
 	$(PROD) up -d
@@ -67,10 +65,8 @@ prod-up: ## start production from the published image (set BASE_URL to the publi
 prod-curators: ## create the production curators (idempotent), print their secret links and save them to curators.txt (gitignored)
 	@for name in $(CURATORS); do $(PROD) exec -T events /dside-events add-poster -name "$$name"; done | tee -a curators.txt
 
-prod-poster-link: ## new secret link for a production curator, also appended to curators.txt: make prod-poster-link SLUG=george-spanos
-	@test -n "$(SLUG)" || { echo 'usage: make prod-poster-link SLUG=george-spanos'; exit 2; }
-	@echo "poster $(SLUG)" >> curators.txt
-	$(PROD) exec -T events /dside-events poster-link -slug "$(SLUG)" | tee -a curators.txt
+prod-poster-links: ## list every production curator with their secret link, saved to curators.txt (gitignored)
+	$(PROD) exec -T events /dside-events poster-links | tee curators.txt
 
 clean: ## remove the binary and the dev database
 	rm -rf bin $(DB_PATH) $(DB_PATH)-wal $(DB_PATH)-shm

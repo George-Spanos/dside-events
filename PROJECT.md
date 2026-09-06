@@ -13,32 +13,32 @@ Most individuals just want to discover events that might interest them.
 
 - Two types of users, users and power users.
 - Power users - Curators/artists - People we know, whitelisted, created by hand with the CLI, which prints their secret login link.
-- No images no videos. All content is text with links to external content. ex musical content related to the event, link to a theater script brief etc.
+- No images no videos. All content is text with links to external content (up to 3 links per event). ex musical content related to the event, link to a theater script brief etc.
 - No spam. A single post per event.
 - Events have tags. Tags are a specific defined list.
 - Users - Attendees - ability to follow tags and/or curators/artists.
-- Users - Attendees - anonymous accounts. The first Interested or Follow creates the account in a cookie; no sign-up, no email, no personal data. A secret link on the account page carries it to another device. Lose the cookie and the link, lose the list.
+- Users - Attendees - anonymous accounts. The first Follow (event, tag or curator) creates the account in a cookie; no sign-up, no email, no personal data. A secret link on the account page carries it to another device. Lose the cookie and the link, lose the list.
 - Simple UI - essentially our app is 
-  - a home page: the next 10 upcoming events, next to the ones you marked, side by side.
+  - a home page: the next 10 upcoming events, next to the ones you follow, side by side.
   - a full list of upcoming events.
-  - a list/calendar of events you're interested in.
+  - a list/calendar of events you follow.
   - an event details view.
   - an event create/edit view.
   - an account view (secret link, forget device, delete).
 - No metrics.
 - One post per event; editing yes, reposting no. Slug/URL immutable.
-- "Not interested" stays internal is not visible to an event.
-- "Intersted is clear and visible to an event.
+- Hiding an event stays private; nobody else sees it.
+- Following an event is public: the event shows how many follow it.
 - Posters are PUBLIC curators: their name is the trust signal, following a poster = following a
   curator. Event pages show who posted.
 - No notifications. Users should open the app to see updates.
 - App should be a PWA.
-- Everyone browses without an account; pressing Interested or Follow starts one.
+- Everyone browses without an account; pressing Follow starts one.
 
 ### Design direction (founder, firm)
 - As simple and non-obstructive as possible. **Old internet feel.**
 - Designed for mobile-first, responsive design. 
-- The UI is essentially two lists on one screen: what's coming (the next 10) and what you marked.
+- The UI is essentially two lists on one screen: what's coming (the next 10) and what you follow.
   Click an event → its info page. THAT'S IT.
 - Minimal CSS: system font stack, underlined text links, no cards/shadows/hero. Motion only as a
   response to an action or a move between pages, 200 ms at most, none on load, off under reduced motion.

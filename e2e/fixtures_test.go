@@ -199,20 +199,20 @@ func createEvent(t testing.TB, c *client, f eventForm) string {
 	return m[1]
 }
 
-// ---- interest ---------------------------------------------------------------
+// ---- event follow ------------------------------------------------------------
 
-var countRe = regexp.MustCompile(`(\d+) (?:were |are )?interested`)
+var countRe = regexp.MustCompile(`(\d+) (?:following|followed)`)
 
-// interestedCount reads the public counter from an event page body:
-// "Nobody yet interested" → 0, "N interested" / "N were interested" → N.
-func interestedCount(t testing.TB, body string) int {
+// followerCount reads the public counter from an event page body:
+// "Nobody following yet" → 0, "N following" / "N followed" (past) → N.
+func followerCount(t testing.TB, body string) int {
 	t.Helper()
-	if strings.Contains(body, "Nobody yet interested") {
+	if strings.Contains(body, "Nobody following yet") {
 		return 0
 	}
 	m := countRe.FindStringSubmatch(body)
 	if m == nil {
-		t.Fatalf("no interested counter in body: %s", snippet(body))
+		t.Fatalf("no following counter in body: %s", snippet(body))
 	}
 	n, err := strconv.Atoi(m[1])
 	if err != nil {
@@ -221,14 +221,15 @@ func interestedCount(t testing.TB, body string) int {
 	return n
 }
 
-// setInterest posts state for slug as c with back and returns the response.
-func setInterest(c *client, slug, state, back string) resp {
+// setEventFollow posts state (follow, hide or clear) for slug as c with back
+// and returns the response.
+func setEventFollow(c *client, slug, state, back string) resp {
 	c.t.Helper()
 	form := url.Values{"state": {state}}
 	if back != "" {
 		form.Set("back", back)
 	}
-	return c.postForm("/e/"+slug+"/interest", form)
+	return c.postForm("/e/"+slug+"/follow", form)
 }
 
 // follow posts a follow/unfollow toggle.

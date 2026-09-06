@@ -11,7 +11,9 @@ import (
 	"dside.studio/events/internal/store"
 )
 
-const maxLinks = 5
+// maxLinks is the number of link rows in the form; fields beyond it are
+// never read, so an event carries at most this many links.
+const maxLinks = 3
 
 // linkField is one label/url pair of the form.
 type linkField struct {
@@ -44,7 +46,7 @@ type eventForm struct {
 
 // fieldOrder is the order of the error summary.
 var fieldOrder = []string{"title", "date", "time", "venue", "price", "tags",
-	"link_url_1", "link_url_2", "link_url_3", "link_url_4", "link_url_5", "description"}
+	"link_url_1", "link_url_2", "link_url_3", "description"}
 
 func (f *eventForm) fail(field, msg string) {
 	if f.Errors == nil {

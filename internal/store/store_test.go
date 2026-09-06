@@ -24,7 +24,7 @@ func openTest(t *testing.T) *Store {
 	return s
 }
 
-func TestEventsAndInterests(t *testing.T) {
+func TestEventsAndFollows(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
 	poster, _, err := s.CreatePoster(ctx, "Maria P.", "maria-p")
@@ -52,24 +52,27 @@ func TestEventsAndInterests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.Interested != 0 || len(e.Tags) != 2 || e.Tags[0] != "concert" || len(e.Links) != 1 || e.PosterSlug != "maria-p" {
+	if e.Followers != 0 || len(e.Tags) != 2 || e.Tags[0] != "concert" || len(e.Links) != 1 || e.PosterSlug != "maria-p" {
 		t.Fatalf("event: %+v", e)
 	}
 	if !e.StartsAt.Equal(start) {
 		t.Fatalf("starts_at %v != %v", e.StartsAt, start)
 	}
 
-	if err := s.SetInterest(ctx, u1.ID, e.ID, Interested); err != nil {
+	if err := s.SetEventFollow(ctx, u1.ID, e.ID, Following); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetInterest(ctx, u1.ID, e.ID, Interested); err != nil { // idempotent
+	if err := s.SetEventFollow(ctx, u1.ID, e.ID, Following); err != nil { // idempotent
 		t.Fatal(err)
 	}
-	if err := s.SetInterest(ctx, u2.ID, e.ID, NotInterested); err != nil {
+	if err := s.SetEventFollow(ctx, u2.ID, e.ID, Hidden); err != nil {
 		t.Fatal(err)
+	}
+	if err := s.SetEventFollow(ctx, u2.ID, e.ID, "maybe"); err == nil {
+		t.Fatal("unknown state accepted by the CHECK constraint")
 	}
 	e, _ = s.EventBySlug(ctx, slug, u2.ID)
-	if e.Interested != 1 || e.ViewerState != NotInterested {
+	if e.Followers != 1 || e.ViewerState != Hidden {
 		t.Fatalf("counter/state: %+v", e)
 	}
 	feed, err := s.Feed(ctx, FeedOpts{From: time.Now(), ViewerID: u2.ID})
@@ -78,19 +81,19 @@ func TestEventsAndInterests(t *testing.T) {
 	}
 	for _, f := range feed {
 		if f.Slug == slug {
-			t.Fatal("not_interested event still in viewer feed")
+			t.Fatal("hidden event still in viewer feed")
 		}
 	}
 	feed, _ = s.Feed(ctx, FeedOpts{From: time.Now(), ViewerID: 0, Tag: "concert"})
 	if len(feed) != 2 {
 		t.Fatalf("anon tag feed len = %d", len(feed))
 	}
-	mine, _ := s.InterestedEvents(ctx, u1.ID)
+	mine, _ := s.FollowedEvents(ctx, u1.ID)
 	hidden, _ := s.HiddenEvents(ctx, u2.ID)
 	if len(mine) != 1 || len(hidden) != 1 {
 		t.Fatalf("mine=%d hidden=%d", len(mine), len(hidden))
 	}
-	if err := s.ClearInterest(ctx, u2.ID, e.ID); err != nil {
+	if err := s.ClearEventFollow(ctx, u2.ID, e.ID); err != nil {
 		t.Fatal(err)
 	}
 	hidden, _ = s.HiddenEvents(ctx, u2.ID)
@@ -114,9 +117,9 @@ func TestEventsAndInterests(t *testing.T) {
 	if _, err := s.EventBySlug(ctx, slug, 0); err != ErrNotFound {
 		t.Fatalf("after delete: %v", err)
 	}
-	mine, _ = s.InterestedEvents(ctx, u1.ID)
+	mine, _ = s.FollowedEvents(ctx, u1.ID)
 	if len(mine) != 0 {
-		t.Fatal("interest did not cascade on event delete")
+		t.Fatal("event follow did not cascade on event delete")
 	}
 	// The deleted slug is retired: the same base skips both it and the live -2.
 	slug3, err := s.CreateEvent(ctx, poster.ID, "synavlia-2026-09-07", in)

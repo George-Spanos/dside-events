@@ -8,7 +8,7 @@
   {{with .Event.Price}}<br>{{.}}{{end}}
 </p>
 {{if .Event.Past}}<p class="muted">This event has passed.</p>{{end}}
-{{template "interest" .Interest}}
+{{template "eventfollow" .Follow}}
 {{with .Event.Links}}<ul class="links">{{range .}}<li><a href="{{.URL}}" rel="noopener">{{.Label}}<span aria-hidden="true"> ↗</span></a></li>{{end}}</ul>{{end}}
 {{with paragraphs .Event.Description}}<div class="desc">{{range .}}<p>{{.}}</p>{{end}}</div>{{end}}
 <hr>

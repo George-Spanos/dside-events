@@ -166,7 +166,7 @@ func TestNotFound_CustomPage(t *testing.T) {
 func TestMethodNotAllowed(t *testing.T) {
 	slug := createEvent(t, asPoster(t, poster1), validEvent(t, tomorrow()))
 	u := newUser(t)
-	for _, p := range []string{"/follow", "/account/delete", "/account/key", "/forget", "/e/" + slug + "/interest", "/e/" + slug + "/delete"} {
+	for _, p := range []string{"/follow", "/account/delete", "/account/key", "/forget", "/e/" + slug + "/follow", "/e/" + slug + "/delete"} {
 		r := u.get(p)
 		if r.Status != 405 {
 			t.Errorf("GET %s: status %d, want 405", p, r.Status)
@@ -177,7 +177,7 @@ func TestMethodNotAllowed(t *testing.T) {
 	assertStatus(t, anon(t).get("/e/"+slug), 200)
 }
 
-// spec: PwaAssets, StartAccount, CreateEvent, EditEvent, DeleteEvent, MarkInterested, FollowTag, RotateSecretLink, ForgetDevice, DeleteAccount, OpenSecretLink
+// spec: PwaAssets, StartAccount, CreateEvent, EditEvent, DeleteEvent, FollowEvent, FollowTag, RotateSecretLink, ForgetDevice, DeleteAccount, OpenSecretLink
 func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 	u := anon(t) // its first POST below starts the account
 	p := asPoster(t, poster1)
@@ -198,7 +198,7 @@ func TestNoJS_AllMutationsAre303Redirects(t *testing.T) {
 			g.Venue = "Elsewhere"
 			return p.postForm("/e/"+slug+"/edit", g.values())
 		}},
-		{"POST /e/{slug}/interest", func() resp { return setInterest(u, slug, "interested", "/e/"+slug) }},
+		{"POST /e/{slug}/follow", func() resp { return setEventFollow(u, slug, "follow", "/e/"+slug) }},
 		{"POST /follow", func() resp { return follow(u, "tag", "concert", "1", "/account") }},
 		{"POST /account/key", func() resp { return u.postForm("/account/key", nil) }},
 		{"POST /e/{slug}/delete", func() resp { return p.postForm("/e/"+slug+"/delete", nil) }},
@@ -231,7 +231,7 @@ func TestNoJS_FormsAreWellFormed(t *testing.T) {
 	slug := createEvent(t, p, validEvent(t, tomorrow()))
 	hidden := createEvent(t, p, validEvent(t, tomorrow()))
 	u := newUser(t)
-	assertRedirect(t, setInterest(u, hidden, "not_interested", "/mine"), "/mine")
+	assertRedirect(t, setEventFollow(u, hidden, "hide", "/mine"), "/mine")
 	assertRedirect(t, follow(u, "poster", poster1.Slug, "1", "/following"), "/following")
 
 	pages := []struct {

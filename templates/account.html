@@ -2,7 +2,7 @@
 {{define "content"}}
 <h1>Account</h1>
 {{if not .Account}}
-<p>This device has no list yet. Press Interested on an event, or follow a tag or a curator, and your account starts here. No sign-up, no email.</p>
+<p>This device has no list yet. Follow an event, a tag or a curator, and your account starts here. No sign-up, no email.</p>
 <p>Opened a secret link before? Open it again on this device to continue there.</p>
 {{else}}
 {{if .Poster}}<p>Your curator page: <a href="/p/{{.Slug}}">/p/{{.Slug}}</a>.</p>{{end}}
@@ -52,7 +52,7 @@
 <p>Curator accounts are removed by hand. Ask us.</p>
 {{else}}
 {{if .Error}}<p class="error" role="alert" id="confirm-err">{{.Error}}</p>{{end}}
-<p>Deletes your account, your follows and your interested marks. It can't be undone.</p>
+<p>Deletes your account, your follows and your hidden events. It can't be undone.</p>
 <form method="post" action="/account/delete">
   <label class="check"><input type="checkbox" name="confirm" value="1" required{{if .Error}} aria-invalid="true" aria-describedby="confirm-err"{{end}}> I understand</label>
   <button>Delete my account</button>
