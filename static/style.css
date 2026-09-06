@@ -1,27 +1,29 @@
 /* dside events — one stylesheet, no breakpoints, no build step. */
 
 :root {
-  --bg: #fff;
-  --fg: #111;
-  --muted: #555;
-  --link: #0000ee;
-  --error: #b00020;
-  --rule: #ccc;
+  --bg: #FCF8EF;
+  --fg: #2E2823;
+  --muted: #6C6157;
+  --link: #875800;
+  --error: #B5261A;
+  --rule: #E2D9C9;
   --measure: 68ch;
+  --sans: ui-rounded, "Trebuchet MS", Ubuntu, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   color-scheme: light dark;
-  font: 100%/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 106.25%/1.5 var(--sans);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111;
-    --fg: #e6e6e6;
-    --muted: #a0a0a0;
-    --link: #8ab4f8;
-    --error: #ff8080;
-    --rule: #3a3a3a;
+    --bg: #272320;
+    --fg: #F1EADF;
+    --muted: #B8AC9D;
+    --link: #E9B653;
+    --error: #FF9585;
+    --rule: #4B433B;
   }
 }
+
 
 /* Base */
 * { box-sizing: border-box; }
@@ -141,3 +143,13 @@ input + .error, textarea + .error, .hint + .error { margin-top: -.75rem; }
 .errors ul { margin-bottom: 0; }
 .errors a { color: inherit; }
 [aria-invalid="true"] { border-color: var(--error); }
+
+/* Kiosk (founder pick, 2026-09-06): warm white and ochre, rounded humanist sans,
+   uppercase section labels, bold tabular times, accent-filled pressed buttons. */
+h1 { font-size: 1.75rem; letter-spacing: -.02em; line-height: 1.2; }
+header h1, header .brand { font-size: 1.375rem; letter-spacing: -.03em; }
+h2 { font-size: .9375rem; text-transform: uppercase; letter-spacing: .08em; }
+.events time { font-weight: bold; }
+a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); }
+button { border-radius: 4px; padding: .3rem .85rem; }
+button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
