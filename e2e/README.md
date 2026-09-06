@@ -113,8 +113,8 @@ rather than by posting a `link_url_4` the contract does not define. Slugs match
 `^[a-z0-9-]+-\d{4}-\d{2}-\d{2}(-\d+)?$`; Greek titles are transliterated
 ("Ταξίδι στη Χώρα των Ήχων" → `taxidi-sti-chora-ton-ichon-…`).
 
-Counter copy: "Nobody following yet", "N following", past events "N followed" /
-"Nobody followed". Hidden state copy: "Hidden from Upcoming." Series copy:
+Counter copy: "N following", past events "N followed"; at zero the event page
+shows no counter at all. Hidden state copy: "Hidden from Upcoming." Series copy:
 "One of N dates" (rows and event page), "Follow or hide applies to all N
 dates." (event page). Repeat messages: `weekday` "Pick weekdays from the
 list." / "Pick at least one weekday."; `times` "Pick valid start times, like

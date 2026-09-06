@@ -61,7 +61,13 @@
           if (nf) f.replaceWith(nf); else li.remove();
         });
       })
-      .catch(function () { form.dataset.native = '1'; btn.click(); });
+      // Hand back to the browser. Unlock first: if that submission never
+      // navigates, the control has to stay pressable rather than dead.
+      .catch(function () {
+        delete form.dataset.busy;
+        form.dataset.native = '1';
+        btn.click();
+      });
   });
 
 

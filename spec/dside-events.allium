@@ -790,9 +790,12 @@ surface EventDetail {
         -- with a hidden back field: one labelled "Follow" until pressed, then
         -- "Following" (state=follow, pressed state=clear), one labelled "Hide"
         -- until pressed, then "Hidden" (state=hide, pressed state=clear); both
-        -- carry aria-pressed. The counter reads "{n} following", or "Nobody
-        -- following yet" at zero; on a past event "{n} followed" or "Nobody
-        -- followed". A press without a session fires StartAccount and then
+        -- carry aria-pressed. The counter reads "{n} following", and at zero
+        -- is not shown at all (founder, 2026-09-06: nobody yet is not news,
+        -- and a zero beside a curator's name reads as a score); on a past
+        -- event "{n} followed", likewise absent at zero (formerly "Nobody
+        -- following yet" / "Nobody followed").
+        -- A press without a session fires StartAccount and then
         -- the event-follow rule in the same request. A past event shows
         -- "This event has passed." and no buttons.
         -- The owner sees an Edit link and a Delete form. Toggles are plain

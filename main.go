@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata"
@@ -26,6 +27,9 @@ import (
 )
 
 const usage = "usage: dside-events serve | add-poster -name x [-slug y] | poster-link -slug y | poster-links | backup -to file"
+
+// posterNameMax bounds the curator name, matching the event title limit.
+const posterNameMax = 120
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -141,8 +145,16 @@ func addPoster(cfg Config, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *name == "" {
+	// The curator name is the trust signal and the most repeated string in
+	// the product: it sits on every row and heads their page. It is the one
+	// text the web forms never validate, so bound it here, to the same limit
+	// as an event title.
+	*name = strings.TrimSpace(*name)
+	switch {
+	case *name == "":
 		return errors.New("add-poster: -name is required")
+	case len([]rune(*name)) > posterNameMax:
+		return fmt.Errorf("add-poster: -name must be %d characters or fewer", posterNameMax)
 	}
 	base := slugBase(*name)
 	if *slug != "" {

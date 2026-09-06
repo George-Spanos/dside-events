@@ -105,7 +105,7 @@ func TestEventDetail_ShowsAllPublicFields(t *testing.T) {
 	assertContains(t, r, "music.example.test")
 	assertContains(t, r, poster1.Name)
 	assertContains(t, r, `href="/p/`+poster1.Slug+`"`)
-	assertContains(t, r, "Nobody following yet")
+	assertNotContains(t, r, `class="count"`)
 	assertHeaderContains(t, r, "Cache-Control", "no-store")
 }
 
@@ -181,7 +181,7 @@ func TestAnon_EventPageOffersFollow_NoOwnerControls(t *testing.T) {
 	// The buttons are there for everyone; pressing one starts the account.
 	assertForm(t, r, `action="`+page+`/follow"`, `value="follow"`)
 	assertForm(t, r, `action="`+page+`/follow"`, `value="hide"`)
-	assertContains(t, r, "Nobody following yet")
+	assertNotContains(t, r, `class="count"`)
 	assertNotContains(t, r, "Log in to follow")
 	if hasLinkToPath(r.Body, "/login") {
 		t.Errorf("anon event page still links to /login")
@@ -196,7 +196,7 @@ func TestAnon_EventPageOffersFollow_NoOwnerControls(t *testing.T) {
 	u := newUser(t)
 	ru := u.get(page)
 	assertStatus(t, ru, 200)
-	for _, frag := range []string{`value="follow"`, `value="hide"`, "Nobody following yet"} {
+	for _, frag := range []string{`value="follow"`, `value="hide"`, `class="count"`} {
 		if (hasForm(r.Body, frag) || containsFold(r.Body, frag)) != (hasForm(ru.Body, frag) || containsFold(ru.Body, frag)) {
 			t.Errorf("anon and user event pages differ on %q", frag)
 		}
@@ -248,6 +248,6 @@ func TestAnon_ProtectedRoutes_403ForPosterOnly_200ForReads(t *testing.T) {
 	r := v.get("/e/" + slug)
 	assertStatus(t, r, 200)
 	assertContains(t, r, f.Title)
-	assertContains(t, r, "Nobody following yet")
+	assertNotContains(t, r, `class="count"`)
 	assertNotListed(t, anon(t), "/upcoming", hijack.Title)
 }

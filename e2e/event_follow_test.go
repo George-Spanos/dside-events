@@ -33,7 +33,6 @@ func TestFollow_CounterPublic_AppearsInMine(t *testing.T) {
 		t.Errorf("public counter = %d, want 1", n)
 	}
 	assertContains(t, r, "1 following")
-	assertNotContains(t, r, "Nobody following yet")
 
 	r = alice.get("/mine")
 	assertStatus(t, r, 200)

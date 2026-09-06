@@ -364,6 +364,59 @@ func TestEventDetail_EditDeleteOnlyForOwner(t *testing.T) {
 }
 
 // spec: AddPoster, PosterSlugsUnique, PosterPage, OpenSecretLink, EventComposer, Poster, Account
+// spec: Account, Account.name, Poster
+func TestAddPoster_CLI_RejectsBlankAndOverlongNames(t *testing.T) {
+	s := startServer(t)
+
+	// The curator name is the one text no web form validates, and it lands on
+	// every row this curator posts. Whitespace is not a name, and 120 is the
+	// same ceiling an event title gets.
+	for _, name := range []string{"   ", "\t\n "} {
+		if out, err := runCLI(s, "add-poster", "-name", name); err == nil {
+			t.Errorf("add-poster accepted the blank name %q\nstdout: %s", name, out)
+		}
+	}
+	if out, err := runCLI(s, "add-poster", "-name", strings.Repeat("ω", 121)); err == nil {
+		t.Errorf("add-poster accepted a 121-character name\nstdout: %s", out)
+	}
+	// 120 is inside the limit, and it is counted in runes: 120 Greek letters
+	// are 240 bytes, and a byte-length check would have rejected them.
+	p := addPoster(t, s, strings.Repeat("ω", 120), uniqSlug("longname"))
+	assertStatus(t, newClient(t, s).get("/p/"+p.Slug), 200)
+
+	// A name is trimmed rather than stored with its padding.
+	p2 := addPoster(t, s, "  Padded P.  ", uniqSlug("padded"))
+	r := newClient(t, s).get("/p/" + p2.Slug)
+	assertStatus(t, r, 200)
+	assertContains(t, r, ">Padded P.</h1>")
+}
+
+// spec: Event, Event.title, UpcomingAll
+func TestEventRow_SurvivesExtremeTitles(t *testing.T) {
+	p := asPoster(t, poster1)
+	v := anon(t)
+
+	// Real curators paste Greek, emoji and unbroken strings. None of these may
+	// 500, and each has to come back as a reachable row.
+	// Lengths leave room for the uniqueness suffix uniqTitle appends; the
+	// 120-rune ceiling itself is covered by TestCreateEvent_ValidationErrors.
+	for _, title := range []string{
+		"Συναυλία στο Γκάζι 🎷 — «Μια Βραδιά»",
+		strings.Repeat("Α", 100),
+		"Ω" + strings.Repeat("ααα", 33),
+	} {
+		f := validEvent(t, tomorrow())
+		f.Title = uniqTitle(t, title)
+		slug := createEvent(t, p, f)
+		r := v.get("/upcoming")
+		assertStatus(t, r, 200)
+		if rowFor(r.Body, slug) == "" {
+			t.Errorf("/upcoming has no row for %q (slug %s)", title, slug)
+		}
+		assertStatus(t, v.get("/e/"+slug), 200)
+	}
+}
+
 func TestAddPoster_CLI_PrintsLink_NoOpForExistingSlug(t *testing.T) {
 	s := startServer(t)
 

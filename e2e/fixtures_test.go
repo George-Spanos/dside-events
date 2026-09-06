@@ -268,15 +268,13 @@ func createSeries(t testing.TB, c *client, f eventForm) (first string, all []str
 var countRe = regexp.MustCompile(`(\d+) (?:following|followed)`)
 
 // followerCount reads the public counter from an event page body:
-// "Nobody following yet" → 0, "N following" / "N followed" (past) → N.
+// "N following" / "N followed" (past) → N. At zero the event page prints no
+// counter at all (founder, 2026-09-06), so its absence is the zero.
 func followerCount(t testing.TB, body string) int {
 	t.Helper()
-	if strings.Contains(body, "Nobody following yet") {
-		return 0
-	}
 	m := countRe.FindStringSubmatch(body)
 	if m == nil {
-		t.Fatalf("no following counter in body: %s", snippet(body))
+		return 0
 	}
 	n, err := strconv.Atoi(m[1])
 	if err != nil {

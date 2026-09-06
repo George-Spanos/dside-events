@@ -112,7 +112,10 @@ h2 + .day { margin-top: 1rem; }
    can afford both and drops under them when it cannot. Intrinsic sizing, no
    breakpoint: 16rem is the narrowest the details are allowed to get. */
 .events li { display: grid; grid-template-columns: 6ch 1fr; column-gap: 1rem; margin-bottom: 1rem; }
-.rowbody { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; }
+/* min-width: 0 so the grid track may shrink below its content: a grid item
+   defaults to min-content, and a long unbroken title would otherwise push the
+   row wider than the page, which has nowhere to scroll. */
+.rowbody { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; min-width: 0; }
 .rowbody > div { flex: 1 1 16rem; max-width: var(--reading); }
 .rowbody > form { flex: 0 0 auto; }
 .meta span { display: block; }
