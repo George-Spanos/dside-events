@@ -97,15 +97,18 @@ entity Event {
     links: List<Link>
     created_at: Timestamp
     updated_at: Timestamp
+    series_id: Integer?                     -- shared by every date of a repeating post; absent for a single event
 
     -- Relationships
     follows: EventFollow with event = this
+    series: Event with series_id = this.series_id when series_id != null
 
     -- Projections
     followed_by: follows where state = following
 
     -- Derived
     follower_count: followed_by.count
+    series_count: series.count              -- 0 for a single event; the dates still posted, this one included
     is_upcoming: starts_at >= athens_day_start(now)    -- black box: midnight in Europe/Athens of the current day
 
     invariant PostedByPoster {
@@ -139,6 +142,7 @@ config {
     max_link_url_length: Integer = 500
     max_link_label_length: Integer = 80
     home_list_size: Integer = 10            -- founder decision, deliberately not a setting: rows per home column
+    max_series_occurrences: Integer = 200   -- dates one repeating post may create; a season of 4 nights a week for 8 months is about 140
 }
 
 ------------------------------------------------------------
@@ -302,6 +306,70 @@ rule CreateEvent {
         -- duplicate case saying "already posted".
 }
 
+-- A repeating post is many ordinary events sharing a series id. Nothing else
+-- is shared: each date has its own slug, is edited and deleted on its own.
+rule CreateSeries {
+    when: CreateSeries(poster, title, first_date, until, weekdays, times, venue, price?, description, tags, links)
+    -- Black box: each day from first_date to until inclusive whose weekday is
+    -- in weekdays, at each of times, read in Europe/Athens, ascending. The
+    -- weekday of first_date itself need not be in weekdays.
+    let starts = series_starts(first_date, until, weekdays, times)
+    requires: poster.is_poster
+    requires: until >= first_date
+    requires: weekdays.count >= 1 and times.count >= 1
+    requires: starts.count >= 2 and starts.count <= config.max_series_occurrences
+    requires: starts.all(s => s >= now - config.max_past_start and s <= now + config.max_future_start)
+    requires: length(title) >= 1 and length(title) <= config.max_title_length
+    requires: length(venue) >= 1 and length(venue) <= config.max_venue_length
+    requires: price = null or length(price) <= config.max_price_length
+    requires: length(description) <= config.max_description_length
+    requires: tags.count >= 1 and tags.count <= config.max_tags
+    requires: links.count <= config.max_links
+    requires: links.all(l => valid_http_url(l.url))          -- black box: http(s) scheme with a host
+    requires: links.all(l => length(l.url) <= config.max_link_url_length)
+    requires: links.all(l => l.label = null or length(l.label) <= config.max_link_label_length)
+    -- One post per event, checked against what the poster already has: no
+    -- other event with the same normalised title on any Athens day this post
+    -- covers. The dates of this post are not compared with one another, so
+    -- two start times on one day are fine.
+    requires: not poster.events.any(e =>
+        normalise_title(e.title) = normalise_title(title)
+        and starts.any(s => athens_day(e.starts_at) = athens_day(s)))
+    ensures:
+        let series = fresh_series_id()                       -- black box: an integer no event carries yet
+        for s in starts:
+            Event.created(
+                poster: poster,
+                slug: unique_slug(title, s),                 -- a second start on one Athens day gets the -2 suffix
+                title: title,
+                description: description,
+                starts_at: s,
+                venue: venue,
+                price: price,
+                tags: tags,
+                links: links,
+                series_id: series,
+                created_at: now,
+                updated_at: now
+            )
+    @guidance
+        -- HTTP: POST /new with the CreateEvent fields plus repeats=1, weekday
+        -- (repeated checkbox; mon tue wed thu fri sat sun), times (optional
+        -- text, comma-separated HH:MM; empty means the time field alone) and
+        -- until (YYYY-MM-DD). date is first_date and time stays required. The
+        -- edit form never offers or reads these fields. Every date is inserted
+        -- in one transaction; success 303 to /e/{slug} of the earliest date.
+        -- Any failed requirement 422 re-rendering the form with the submitted
+        -- values: weekday "Pick weekdays from the list." / "Pick at least one
+        -- weekday."; times "Pick valid start times, like 18:00, 21:00." /
+        -- "Each start time must be different."; until "Pick an until date." /
+        -- "Pick a valid until date." / "Until must be on or after the date." /
+        -- "Until must be within the next three years." / "A repeating event
+        -- needs at least two dates." / "A repeating event can have at most
+        -- 200 dates."; the duplicate case on title, "You already posted this
+        -- event on 2 January 2027." naming the first covered day that clashes.
+}
+
 rule EditEvent {
     when: EditEvent(poster, event, title, starts_at, venue, price?, description, tags, links)
     requires: event.poster = poster
@@ -350,45 +418,54 @@ rule DeleteEvent {
 
 rule FollowEvent {
     when: FollowEvent(account, event)
-    let existing = EventFollow{account, event}
+    let members = if event.series_id = null then {event} else event.series   -- a press on one date acts on the whole run
     ensures:
-        if exists existing:
-            existing.state = following
-            existing.updated_at = now
-        else:
-            EventFollow.created(account: account, event: event, state: following, updated_at: now)
+        for m in members:
+            let existing = EventFollow{account, m}
+            if exists existing:
+                existing.state = following
+                existing.updated_at = now
+            else:
+                EventFollow.created(account: account, event: m, state: following, updated_at: now)
     @guidance
         -- HTTP: POST /e/{slug}/follow with state=follow and back; 303 to back
         -- when it is a local path, otherwise to /e/{slug}. Idempotent. Without
         -- a session StartAccount runs first in the same request. The follower
-        -- count on an event is public.
+        -- count on an event is public. Following one date of a repeating
+        -- event follows every date; each date's public count therefore reads
+        -- the same.
 }
 
 rule HideEvent {
     when: HideEvent(account, event)
-    let existing = EventFollow{account, event}
+    let members = if event.series_id = null then {event} else event.series   -- a press on one date acts on the whole run
     ensures:
-        if exists existing:
-            existing.state = hidden
-            existing.updated_at = now
-        else:
-            EventFollow.created(account: account, event: event, state: hidden, updated_at: now)
+        for m in members:
+            let existing = EventFollow{account, m}
+            if exists existing:
+                existing.state = hidden
+                existing.updated_at = now
+            else:
+                EventFollow.created(account: account, event: m, state: hidden, updated_at: now)
     @guidance
         -- HTTP: same endpoint with state=hide; without a session StartAccount
         -- runs first. Never expose a hidden state to anyone but the owning
         -- account: not to other users, not to the poster, and never in the
-        -- public count.
+        -- public count. Hiding one date hides every date of the run.
 }
 
 rule UnfollowEvent {
     when: UnfollowEvent(account, event)
-    let existing = EventFollow{account, event}
-    ensures: not exists existing
+    let members = if event.series_id = null then {event} else event.series   -- a press on one date acts on the whole run
+    ensures:
+        for m in members:
+            not exists EventFollow{account, m}
     @guidance
         -- HTTP: same endpoint with state=clear. Removes the EventFollow
         -- whatever its state, so it both unfollows a followed event and shows a
         -- hidden one again. Any other state value answers 400; an unknown slug
-        -- 404. Clearing when nothing is set is a no-op.
+        -- 404. Clearing when nothing is set is a no-op. Clearing one date
+        -- clears every date, whatever its state.
 }
 
 -- Account -------------------------------------------------
@@ -456,6 +533,15 @@ invariant OneFollowPerAccountEvent {
             a != b implies not (a.account = b.account and a.event = b.event)
 }
 
+-- Follow, hide and clear act on a whole run, so no account can be in two
+-- minds about the dates of one repeating post.
+invariant SeriesFollowStateUniform {
+    for a in Events:
+        for b in Events:
+            a != b and a.series_id != null and a.series_id = b.series_id implies
+                a.follows.all(f => b.follows.any(g => g.account = f.account and g.state = f.state))
+}
+
 ------------------------------------------------------------
 -- Actor Declarations
 ------------------------------------------------------------
@@ -483,7 +569,8 @@ surface Home {
     -- narrows visible before the cut (see FilterableByTag on UpcomingAll).
     let upcoming_next = first_n(visible, config.home_list_size)      -- black box: the first n in ascending starts_at
     -- The visitor's upcoming followed events, soonest first, at most
-    -- config.home_list_size; empty without a session.
+    -- config.home_list_size; empty without a session. The same tag filter
+    -- narrows this column too, so both columns always show the same tag.
     let mine_next = first_n(upcoming where follows.any(f => f.account = account and f.state = following), config.home_list_size)
 
     exposes:
@@ -494,6 +581,7 @@ surface Home {
             e.venue
             e.price
             e.follower_count
+            e.series_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -504,6 +592,7 @@ surface Home {
             e.venue
             e.price
             e.follower_count
+            e.series_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -541,9 +630,12 @@ surface Home {
     @guidance
         -- HTTP: GET / and GET /?tag={tag}, 200 with or without a session;
         -- unknown tag 404. The filters row (all · one link per Tag) spans the
-        -- full width above both columns. Column Mine: heading "Mine", the rows
-        -- of mine_next grouped by Athens day, then the link "All of mine →" to
-        -- /mine. Column Upcoming: heading "Upcoming", the rows of
+        -- full width above both columns and narrows both. With script, a
+        -- press on a row re-renders both columns from the response, so a
+        -- followed event appears in Mine at once; without script the page
+        -- reloads to the same result. Column Mine: heading
+        -- "Mine", the rows of mine_next grouped by Athens day, then the link
+        -- "All of mine →" to /mine. Column Upcoming: heading "Upcoming", the rows of
         -- upcoming_next grouped by Athens day, then the link "All upcoming
         -- events →" to /upcoming (carrying ?tag= when filtered); that link is
         -- shown even when the list is empty, under the usual empty copy. The
@@ -576,6 +668,7 @@ surface UpcomingAll {
             e.venue
             e.price
             e.follower_count
+            e.series_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -640,6 +733,7 @@ surface EventDetail {
         event.poster.name
         event.poster.slug
         event.follower_count
+        event.series_count
         event.is_upcoming
         mine.state when exists mine
 
@@ -705,6 +799,7 @@ surface PosterPage {
             e.venue
             e.price
             e.follower_count
+            e.series_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -758,6 +853,7 @@ surface MyEvents {
             e.venue
             e.price
             e.follower_count
+            e.series_count
             e.tags
             e.poster.name
             e.poster.slug
@@ -886,18 +982,24 @@ surface EventComposer {
 
     provides:
         CreateEvent(curator, title, starts_at, venue, price?, description, tags, links)
+        CreateSeries(curator, title, first_date, until, weekdays, times, venue, price?, description, tags, links)
 
     @guarantee OnePostPerEvent
-        -- A second post with the same normalised title on the same Athens day
-        -- by the same curator is refused; editing is the only way to change a
-        -- posted event.
+        -- A second post with the same normalised title on an Athens day the
+        -- curator already covers, by one event or by a date of a repeating
+        -- one, is refused; the dates of a single repeating post do not count
+        -- against each other. Editing is the only way to change a posted
+        -- event.
     @guarantee TextOnly
         -- Events carry no images or video; external material is reached only
         -- through the links.
     @guidance
         -- HTTP: GET /new renders the form (visible labels, hints, an error
-        -- summary with anchors on 422); POST /new is described in CreateEvent.
-        -- Anyone who is not a poster, anonymous included, gets 403.
+        -- summary with anchors on 422) with the repeats controls always in
+        -- view: a Repeats checkbox, the seven weekday checkboxes, Times and
+        -- Until. POST /new is described in CreateEvent and, when repeats=1 is
+        -- sent, in CreateSeries. Anyone who is not a poster, anonymous
+        -- included, gets 403.
 }
 
 surface EventEditor {
@@ -982,3 +1084,8 @@ open question "OQ-16 Upcoming boundary: does an event stay upcoming until the en
 open question "OQ-17 Abuse: should cookieless POSTs creating accounts be rate-limited or should idle accounts be purged? (default: no, POC)"
 open question "OQ-19 Reaching /mine: since the nav lost its mine link, a visitor whose event follows are all past or hidden has no link to /mine (Past, Hidden). Add one on /account? (default: yes, a plain link on the account page; not implemented until the founder agrees)"
 open question "OQ-18 Key at rest: the secret key is stored in clear so the account page can show the link, which makes a copy of the database every login; acceptable for the POC, or should links be shown only once at creation and rotation with a hash at rest? (default: in clear, POC)"
+-- OQ-20 (repeating events) resolved by the founder on 2026-09-06: a repeating post is
+-- weekdays x start times x an until date, expanded to ordinary events sharing a series
+-- id (rule CreateSeries, config.max_series_occurrences). Edit and delete stay per date;
+-- follow, hide and clear act on the whole run (invariant SeriesFollowStateUniform). No
+-- series page, no series edit.

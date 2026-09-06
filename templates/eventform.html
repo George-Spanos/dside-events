@@ -22,6 +22,29 @@
     </div>
   </div>
 
+  {{if not .Edit}}<fieldset id="repeats">
+    <label class="check"><input type="checkbox" name="repeats" value="1"{{if $f.Repeats}} checked{{end}}> Repeats</label>
+    <fieldset id="weekday"{{with index $f.Errors "weekday"}} aria-describedby="weekday-err"{{end}}>
+      <legend>Days — every week, from the date above</legend>
+      {{range .Weekdays}}<label class="check"><input type="checkbox" name="weekday" value="{{.Value}}"{{if index $f.Weekdays .Day}} checked{{end}}> {{.Label}}</label>
+      {{end}}
+      {{with index $f.Errors "weekday"}}<p class="error" id="weekday-err">{{.}}</p>{{end}}
+    </fieldset>
+    <div class="row">
+      <div>
+        <label for="times">Times</label>
+        <input id="times" name="times" maxlength="60" autocomplete="off" placeholder="18:00, 21:00" value="{{$f.Times}}" aria-describedby="times-hint{{with index $f.Errors "times"}} times-err{{end}}"{{with index $f.Errors "times"}} aria-invalid="true"{{end}}>
+        <p class="hint" id="times-hint">Comma-separated. Replaces Start time on every date. Leave empty to use Start time.</p>
+        {{with index $f.Errors "times"}}<p class="error" id="times-err">{{.}}</p>{{end}}
+      </div>
+      <div>
+        <label for="until">Until</label>
+        <input id="until" name="until" type="date" value="{{$f.Until}}"{{with index $f.Errors "until"}} aria-invalid="true" aria-describedby="until-err"{{end}}>
+        {{with index $f.Errors "until"}}<p class="error" id="until-err">{{.}}</p>{{end}}
+      </div>
+    </div>
+  </fieldset>{{end}}
+
   <label for="venue">Venue</label>
   <input id="venue" name="venue" maxlength="120" required value="{{$f.Venue}}"{{with index $f.Errors "venue"}} aria-invalid="true" aria-describedby="venue-err"{{end}}>
   {{with index $f.Errors "venue"}}<p class="error" id="venue-err">{{.}}</p>{{end}}

@@ -13,27 +13,30 @@ const homeListSize = 10 // founder decision, deliberately not configurable
 // FollowView drives the "eventfollow" partial on the event page (both
 // buttons + counter).
 type FollowView struct {
-	Action string
-	Back   string
-	State  string // "", following, hidden
-	Count  int
-	Past   bool
+	Action      string
+	Back        string
+	State       string // "", following, hidden
+	Count       int
+	Past        bool
+	SeriesCount int // dates in the run the toggle acts on; 0 or 1 for a single event
 }
 
 // EventRow is one line of the programme list. Back is non-empty for upcoming
 // rows, which carry the Follow toggle posting back to that URL.
 type EventRow struct {
-	Slug       string
-	Title      string
-	Start      time.Time
-	Venue      string
-	Price      string
-	Followers  int
-	Tags       []string
-	PosterName string
-	PosterSlug string
-	Following  bool   // the viewer follows the event
-	Back       string // current path incl. query; "" for past rows (no toggle)
+	Slug        string
+	Title       string
+	Start       time.Time
+	Venue       string
+	Price       string
+	Followers   int
+	Tags        []string
+	PosterName  string
+	PosterSlug  string
+	SeriesID    int64 // shared by every date of a repeating event; 0 when standalone
+	SeriesCount int
+	Following   bool   // the viewer follows the event
+	Back        string // current path incl. query; "" for past rows (no toggle)
 }
 
 // DayGroup is the rows of one Athens day.
@@ -76,7 +79,7 @@ type homePage struct {
 
 func row(e store.Event) EventRow {
 	return EventRow{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price, Followers: e.Followers,
-		Tags: e.Tags, PosterName: e.PosterName, PosterSlug: e.PosterSlug}
+		Tags: e.Tags, PosterName: e.PosterName, PosterSlug: e.PosterSlug, SeriesID: e.SeriesID, SeriesCount: e.SeriesCount}
 }
 
 // rows converts past events: no toggle.
@@ -189,7 +192,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) error {
 	}
 	page.Upcoming = s.morph(s.groupByDay(toggleRows(events, back)))
 	if acct != nil {
-		followed, err := s.store.FollowedEvents(r.Context(), acct.ID)
+		followed, err := s.store.FollowedEvents(r.Context(), acct.ID, tag)
 		if err != nil {
 			return err
 		}
@@ -233,7 +236,7 @@ func (s *Server) mine(w http.ResponseWriter, r *http.Request) error {
 	if acct == nil {
 		return s.render(w, r, http.StatusOK, "mine", minePage{Base: s.base(r), Empty: true})
 	}
-	followed, err := s.store.FollowedEvents(r.Context(), acct.ID)
+	followed, err := s.store.FollowedEvents(r.Context(), acct.ID, "")
 	if err != nil {
 		return err
 	}
@@ -263,6 +266,7 @@ type eventView struct {
 	Links       []store.Link
 	Past        bool
 	Poster      posterRef
+	SeriesCount int
 }
 
 type eventPage struct {
@@ -282,9 +286,10 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
 	page := eventPage{
 		Base: s.base(r),
 		Event: eventView{Slug: e.Slug, Title: e.Title, Start: e.StartsAt, Venue: e.Venue, Price: e.Price,
-			Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug}},
+			Description: e.Description, Tags: e.Tags, Links: e.Links, Past: past, Poster: posterRef{e.PosterName, e.PosterSlug},
+			SeriesCount: e.SeriesCount},
 		Follow: FollowView{Action: "/e/" + e.Slug + "/follow", Back: "/e/" + e.Slug, State: e.ViewerState,
-			Count: e.Followers, Past: past},
+			Count: e.Followers, Past: past, SeriesCount: e.SeriesCount},
 		CanEdit: acct != nil && acct.ID == e.PosterID,
 	}
 	return s.render(w, r, http.StatusOK, "event", page)

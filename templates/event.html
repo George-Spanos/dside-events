@@ -6,6 +6,7 @@
   {{.Event.Venue}}<br>
   {{range $i, $t := .Event.Tags}}{{if $i}} · {{end}}<a href="/?tag={{$t}}">{{$t}}</a>{{end}}
   {{with .Event.Price}}<br>{{.}}{{end}}
+  {{if gt .Event.SeriesCount 1}}<br><small class="series">One of {{.Event.SeriesCount}} dates</small>{{end}}
 </p>
 {{if .Event.Past}}<p class="muted">This event has passed.</p>{{end}}
 {{template "eventfollow" .Follow}}

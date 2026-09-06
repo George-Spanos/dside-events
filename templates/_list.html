@@ -3,7 +3,7 @@
 <h3 class="day"><b>{{if .Label}}{{.Label}} · {{end}}{{weekday .Date}}</b> {{date .Date}}</h3>
 <ul class="events">
   {{range .Events}}
-  <li>
+  <li{{if gt .SeriesCount 1}} data-series="{{.SeriesID}}"{{end}}>
     <time datetime="{{iso .Start}}">{{clock .Start}}</time>
     <div>
       <a href="/e/{{.Slug}}"{{if $.Morph}} style="view-transition-name: e-{{.Slug}}"{{end}}>{{.Title}}</a>
@@ -12,6 +12,7 @@
         <span>{{.Venue}}{{with .Price}}, {{.}}{{end}}</span>
         <span><a href="/p/{{.PosterSlug}}">{{.PosterName}}</a></span>
         <span>{{.Followers}} following</span>
+        {{if gt .SeriesCount 1}}<span class="series">One of {{.SeriesCount}} dates</span>{{end}}
       </small>
     </div>
     {{if .Back}}<form method="post" action="/e/{{.Slug}}/follow" data-toggle class="row-toggle">

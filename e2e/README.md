@@ -61,19 +61,19 @@ Both CLI commands work while the server runs (WAL + busy_timeout). Keys are
 
 | Method | Path | Who | Result |
 |---|---|---|---|
-| GET | `/`, `/?tag={tag}` | anyone | home: `<body class="wide">`, filters row (unknown tag → 404), then `<div class="columns">` with `<section class="mine">` (only with a session AND ≥1 upcoming followed event: `<h2>Mine</h2>`, at most 10 soonest, `<a href="/mine">All of mine →</a>`) before `<section class="upcoming">` (`<h2>Upcoming</h2>`, the next 10 upcoming from Athens midnight today, `hidden` events left out, `<a href="/upcoming{?tag=…}">All upcoming events →</a>`); the 10 is hardcoded, no paging |
+| GET | `/`, `/?tag={tag}` | anyone | home: `<body class="wide">`, filters row (unknown tag → 404), then `<div class="columns">` with `<section class="mine">` (only with a session AND ≥1 upcoming followed event, narrowed by `?tag=` like Upcoming: `<h2>Mine</h2>`, at most 10 soonest, `<a href="/mine">All of mine →</a>`) before `<section class="upcoming">` (`<h2>Upcoming</h2>`, the next 10 upcoming from Athens midnight today, `hidden` events left out, `<a href="/upcoming{?tag=…}">All upcoming events →</a>`); the 10 is hardcoded, no paging |
 | GET | `/upcoming`, `/upcoming?tag={tag}` | anyone | 200, h1 "Upcoming", `<title>Upcoming · dside events</title>`; ALL upcoming events grouped by day, one column, same filters row; unknown tag → 404; with a session leaves out `hidden` events |
-| GET | `/mine` | anyone | 200; Upcoming (asc), Past (desc), Hidden ("Events you hid. They stay out of your feed.", each row with a "Show again" `state=clear` button); no session / nothing followed or hidden → h1 "Mine" + "Nothing here yet. Follow an event and it shows up here." |
-| GET | `/e/{slug}` | anyone | event page, identical for anon and user: Follow / Hide buttons + counter; the pressed one reads `Following` / `Hidden` with `aria-pressed="true"` (`data-on`/`data-off`, the check mark is CSS), a hidden event adds "Hidden from your feed."; owner: Edit link + Delete form; past: "This event has passed.", no buttons; no login link |
-| POST | `/e/{slug}/follow` | anyone | no session → creates `Account{role user}` + session, sets cookie, then acts; `state=follow\|hide\|clear` (follow → `following`, hide → `hidden`, clear → row deleted), `back`; 303 → `back` (local path only) else `/e/{slug}`; bad state → 400; unknown slug → 404 |
+| GET | `/mine` | anyone | 200; Upcoming (asc), Past (desc), Hidden ("Events you hid. They stay out of your feed.", each row with a "Show again" `state=clear` button); a followed or hidden repeating event lists every one of its dates; no session / nothing followed or hidden → h1 "Mine" + "Nothing here yet. Follow an event and it shows up here." |
+| GET | `/e/{slug}` | anyone | event page, identical for anon and user: Follow / Hide buttons + counter; the pressed one reads `Following` / `Hidden` with `aria-pressed="true"` (`data-on`/`data-off`, the check mark is CSS), a hidden event adds "Hidden from your feed."; a date of a repeating event adds `<small class="series">One of N dates</small>` to the details and `<small>Follow or hide applies to all N dates.</small>` after the counter (N ≥ 2, the dates still posted); owner: Edit link + Delete form; past: "This event has passed.", no buttons; no login link |
+| POST | `/e/{slug}/follow` | anyone | no session → creates `Account{role user}` + session, sets cookie, then acts; `state=follow\|hide\|clear` (follow → `following`, hide → `hidden`, clear → row deleted), `back`; on a date of a repeating event the same row is written for every date of the series (follow, hide and clear alike), so counters and pressed states agree across the run; 303 → `back` (local path only) else `/e/{slug}`; bad state → 400; unknown slug → 404 |
 | GET | `/p/{slug}` | anyone | poster name, Upcoming then Past lists; not a poster → 404 |
 | GET | `/k/{key}` | anyone | valid → new session for that account (also when another cookie is present: switches), `Set-Cookie: session=…; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`, 303 `/mine`; unknown → 404 "This link doesn't work. It may have been replaced with a new one." |
 | GET | `/account` | anyone | 200, two variants. No session: h1 "Account" + "This device has no list yet. Follow an event and your account starts here. No sign-up, no email." + "Opened a secret link before? Open it again on this device to continue there." With session: `<h2>Your secret link</h2>` `<a href="{link}">{link}</a>`, form `/account/key` "Get a new link", `<h2>This device</h2>` form `/forget` "Forget this device", `<h2>Delete account</h2>` "Deletes your account, your follows and your hidden events. It can't be undone." + form with `confirm` (posters: "Your curator page: …" and "removed by hand" instead) |
 | POST | `/account/key` | session | rotate key, 303 `/account`; old link → 404, existing sessions untouched; no session → 303 `/account`; GET → 405 |
 | POST | `/forget` | session | delete the session row, clear cookie, 303 `/`; account and data stay, link restores them; no session → 303 `/account`; GET → 405 |
 | POST | `/account/delete` | session user | `confirm=1` required (else 422); poster → 403 "by hand"; 303 `/`; cascades sessions, event follows, key (link → 404); no session → 303 `/account` |
-| GET/POST | `/new` | poster | event form; non-poster incl. anon → 403; OK → 303 `/e/{slug}`; invalid → 422 re-render with values and `role="alert"`; duplicate (same poster, normalised title, Athens day) → 422 "already posted" |
-| GET/POST | `/e/{slug}/edit` | owner | prefilled; slug never changes; other poster / user / anon → 403; unknown → 404 |
+| GET/POST | `/new` | poster | event form incl. the repeat controls (`repeats`, seven `weekday`, `times`, `until`, always visible); non-poster incl. anon → 403; OK → 303 `/e/{slug}`; with `repeats=1` one event per date (every day from `date` to `until` whose weekday is ticked, at each of `times`, else at `time`; 2..200 dates; the first date's weekday need not be ticked) sharing a series id, each with its own slug (same-day second start gets `-2`), 303 → `/e/{slug}` of the earliest; invalid → 422 re-render with values and `role="alert"`, the repeat messages on `weekday` / `times` / `until` (see copy below); duplicate (same poster, normalised title, an Athens day already covered by an event or by a date of another series; the dates of one post never clash with each other) → 422 "already posted" |
+| GET/POST | `/e/{slug}/edit` | owner | prefilled; no repeat controls, and `repeats`/`weekday`/`times`/`until` in the POST are ignored, so an edit changes one date only; slug never changes; other poster / user / anon → 403; unknown → 404 |
 | POST | `/e/{slug}/delete` | owner | hard delete with cascade, 303 `/`; slug → 404 afterwards; others → 403 |
 | GET | `/healthz` | anyone | `200 ok` text/plain |
 | GET | `/manifest.webmanifest` | anyone | `application/manifest+json` with name, start_url, display, icons |
@@ -86,8 +86,12 @@ Nav is always `mine · account` (+ `new` for posters); no page links to a
 login. Read pages never redirect and never set a cookie.
 
 List rows (`/` both columns, `/upcoming`, `/mine` Upcoming,
-`/p/{slug}` Upcoming) are `<li>` inside `<ul class="events">`:
-`<time>`, `<a href="/e/{slug}">`, and one toggle form
+`/p/{slug}` Upcoming) are `<li>` inside `<ul class="events">` (a date of a
+repeating event: `<li data-series="{id}">`, the id shared by its siblings):
+`<time>`, `<a href="/e/{slug}">`, a `<small class="meta">` of four `<span>`s
+(tags, venue + price, poster, "N following") plus a fifth
+`<span class="series">One of N dates</span>` when the row is one of N ≥ 2
+dates, and one toggle form
 `<form method="post" action="/e/{slug}/follow" …>` with hidden
 `name="back"` (the current path incl. query) and a single
 `<button name="state" value="follow|clear" aria-pressed="false|true" data-on="Following" data-off="Follow">`
@@ -95,18 +99,31 @@ reading `Follow` or `Following` (the check mark is CSS). Rows never offer `hide`
 Past rows (`/mine` Past, `/p/{slug}` Past, `<ul class="past">`) carry no
 form. Day headings are `<h3 class="day">{Today · |Tomorrow · }<b>Weekday</b>
 2 January</h3>` everywhere. Helpers: `eventRows`, `rowsFor`/`rowFor`,
-`slugOf`, `section` (client_test.go) and `assertRowToggle`
-(event_follow_test.go).
+`slugOf`, `section` (client_test.go), `assertRowToggle`
+(event_follow_test.go), `seriesSlugs`/`createSeries` (fixtures_test.go) and
+`seriesOf`/`inputWith` (series_test.go).
 
 Event form fields: `title`, `date`, `time`, `venue`, `price`, `tag` (repeated),
-`link_label_1..3`, `link_url_1..3`, `description`. There is no fourth link
+`link_label_1..3`, `link_url_1..3`, `description`; on `/new` only, the repeat
+controls `repeats` (`1`), `weekday` (repeated, `mon`..`sun`), `times`
+(optional, comma-separated `HH:MM`) and `until` (`YYYY-MM-DD`), which the
+`eventForm` fixture emits only when set. There is no fourth link
 field, so `max_links` (3) is checked as "the form offers exactly three slots"
 rather than by posting a `link_url_4` the contract does not define. Slugs match
 `^[a-z0-9-]+-\d{4}-\d{2}-\d{2}(-\d+)?$`; Greek titles are transliterated
 ("Ταξίδι στη Χώρα των Ήχων" → `taxidi-sti-chora-ton-ichon-…`).
 
 Counter copy: "Nobody following yet", "N following", past events "N followed" /
-"Nobody followed". Hidden state copy: "Hidden from your feed." Copy assertions
+"Nobody followed". Hidden state copy: "Hidden from your feed." Series copy:
+"One of N dates" (rows and event page), "Follow or hide applies to all N
+dates." (event page). Repeat messages: `weekday` "Pick weekdays from the
+list." / "Pick at least one weekday."; `times` "Pick valid start times, like
+18:00, 21:00." / "Each start time must be different."; `until` "Pick an until
+date." / "Pick a valid until date." / "Until must be on or after the date." /
+"Until must be within the next three years." / "A repeating event needs at
+least two dates." / "A repeating event can have at most 200 dates."; the
+duplicate message names the day ("You already posted this event on 2 January
+2027.") and is asserted only as "already posted". Copy assertions
 unescape HTML and normalise curly apostrophes (`assertCopy`), so templates may
 emit `&#39;` or `’`.
 
@@ -144,11 +161,12 @@ guarantees as `Home.TenAtMost`, `Home.SideBySide`, the config as
 | `main_test.go` | `TestMain`: build, temp dir, shared server, seed posters via `add-poster` (server first, then CLI with `BASE_URL`), teardown |
 | `harness_test.go` | `server`, `startServer`, `launchServer`, `waitHealthy`, `runCLI`, `addPoster`/`addPosterRaw`, `posterLink`, `parseLink` |
 | `client_test.go` | `client` (cookie jar, no redirects), `get`/`postForm`/`follow`/`cookie`/`setRawCookie`, `sessionSetCookie`, assertions incl. `assertCopy`, `assertSessionCookieFlags`, `assertListed`/`assertNotListed`, HTML helpers incl. `eventRows`/`rowsFor`/`rowFor`/`slugOf`/`section` |
-| `fixtures_test.go` | `uid`/`uniqTitle`/`uniqSlug`, `asPoster`/`newUser`/`openLink`/`secretLink`/`keyPath`/`randomKey`, `eventForm`/`validEvent`/`createEvent`, `tomorrow`/`yesterday`, `followerCount`, `setEventFollow` |
+| `fixtures_test.go` | `uid`/`uniqTitle`/`uniqSlug`, `asPoster`/`newUser`/`openLink`/`secretLink`/`keyPath`/`randomKey`, `eventForm`/`validEvent`/`createEvent`, `weekdayValue`/`validSeries`/`seriesSlugs`/`createSeries`, `tomorrow`/`yesterday`, `followerCount`, `setEventFollow` |
 | `browse_test.go` | `/upcoming` list, tag filters on `/upcoming` and `/`, event and poster pages, anonymous event page with buttons, 403/200 route table |
 | `home_test.go` | home page: Upcoming column of at most ten with the "All upcoming events →" link (also filtered), the eleventh-plus on `/upcoming` only, Mine column present/absent, `<body class="wide">` only on `/`, `/upcoming` h1/title/tag filter/404, `<h3 class="day">` headings with bold weekday |
 | `secret_test.go` | lazy account creation, cookie flags, no-session read pages, account page with link and forms, open / unknown / switch link, rotate, forget, session-less POSTs, login routes gone, poster link login, `poster-link` CLI |
 | `account_test.go` | account page poster variant, self-deletion (data, sessions, link), confirm, poster 403 |
 | `events_test.go` | create/edit/delete, validation, duplicates, slugs, owner checks, `add-poster` CLI (link, no-op for existing slug, unique slugs/keys) |
 | `event_follow_test.go` | follow / hide / clear (`FollowEvent`, `HideEvent`, `UnfollowEvent`), `follower_count`, `/mine` incl. the Hidden section, anon Follow starts an account, row toggles on every list (`assertRowToggle`), past rows without a toggle, pressed Following / Hidden buttons on the event page (`HiddenIsPrivate`) |
+| `series_test.go` | repeating events (`CreateSeries`): form controls, expansion to rows with `data-series` and "One of N dates", several times per day, first date not ticked, duplicates against covered days, the validation table incl. the 200 cap, edit and delete per date, follow / hide / clear acting on the whole run |
 | `pwa_test.go` | manifest, service worker, static assets, 404/405, no-JS guarantees (every mutation 303, forms well-formed, `/k/` is the one state-changing GET) |

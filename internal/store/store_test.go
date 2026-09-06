@@ -88,7 +88,7 @@ func TestEventsAndFollows(t *testing.T) {
 	if len(feed) != 2 {
 		t.Fatalf("anon tag feed len = %d", len(feed))
 	}
-	mine, _ := s.FollowedEvents(ctx, u1.ID)
+	mine, _ := s.FollowedEvents(ctx, u1.ID, "")
 	hidden, _ := s.HiddenEvents(ctx, u2.ID)
 	if len(mine) != 1 || len(hidden) != 1 {
 		t.Fatalf("mine=%d hidden=%d", len(mine), len(hidden))
@@ -117,7 +117,7 @@ func TestEventsAndFollows(t *testing.T) {
 	if _, err := s.EventBySlug(ctx, slug, 0); err != ErrNotFound {
 		t.Fatalf("after delete: %v", err)
 	}
-	mine, _ = s.FollowedEvents(ctx, u1.ID)
+	mine, _ = s.FollowedEvents(ctx, u1.ID, "")
 	if len(mine) != 0 {
 		t.Fatal("event follow did not cascade on event delete")
 	}
@@ -128,6 +128,129 @@ func TestEventsAndFollows(t *testing.T) {
 	}
 	if err := s.DeleteEvent(ctx, e.ID); err != ErrNotFound {
 		t.Fatalf("delete twice: %v, want ErrNotFound", err)
+	}
+}
+
+func TestCreateSeries(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	poster, _, err := s.CreatePoster(ctx, "Maria P.", "maria-p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u1, _, _ := s.CreateUser(ctx)
+	u2, _, _ := s.CreateUser(ctx)
+
+	// Three dates, two of them on the same day: 18:00 and 21:00 the day
+	// after tomorrow, 20:00 two days later.
+	day := time.Now().UTC().Add(48 * time.Hour)
+	d1 := time.Date(day.Year(), day.Month(), day.Day(), 18, 0, 0, 0, time.UTC)
+	starts := []time.Time{d1, d1.Add(3 * time.Hour), d1.AddDate(0, 0, 2).Add(2 * time.Hour)}
+	baseSlug := func(t time.Time) string { return "show-" + t.Format("2006-01-02") }
+	in := EventInput{Title: "Show", Venue: "Stage", Tags: []string{"theater"},
+		Links: []Link{{Label: "Tickets", URL: "https://example.com/t"}}}
+	slug, err := s.CreateSeries(ctx, poster.ID, starts, baseSlug, in)
+	if err != nil || slug != baseSlug(d1) {
+		t.Fatalf("create series: %v %q", err, slug)
+	}
+	want := []string{baseSlug(d1), baseSlug(d1) + "-2", baseSlug(starts[2])}
+	var members []*Event
+	for i, w := range want {
+		e, err := s.EventBySlug(ctx, w, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", w, err)
+		}
+		if !e.StartsAt.Equal(starts[i]) || len(e.Tags) != 1 || len(e.Links) != 1 {
+			t.Fatalf("%s: %+v", w, e)
+		}
+		members = append(members, e)
+	}
+	seriesID := members[0].SeriesID
+	for _, e := range members {
+		if seriesID == 0 || e.SeriesID != seriesID || e.SeriesCount != 3 {
+			t.Fatalf("series fields: %+v", e)
+		}
+	}
+	standaloneSlug, err := s.CreateEvent(ctx, poster.ID, "solo", EventInput{Title: "Solo", StartsAt: d1, Venue: "Bar"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	solo, _ := s.EventBySlug(ctx, standaloneSlug, 0)
+	if solo.SeriesID != 0 || solo.SeriesCount != 0 {
+		t.Fatalf("standalone: %+v", solo)
+	}
+	// A second series mints its own id.
+	other := func(t time.Time) string { return "other-" + t.Format("2006-01-02") }
+	otherSlug, err := s.CreateSeries(ctx, poster.ID, starts[:2], other, EventInput{Title: "Other", Venue: "Bar"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := s.EventBySlug(ctx, otherSlug, 0); o.SeriesID == seriesID || o.SeriesID == 0 || o.SeriesCount != 2 {
+		t.Fatalf("second series: %+v", o)
+	}
+
+	// Following one date follows the whole series and nothing else.
+	if err := s.SetEventFollow(ctx, u1.ID, members[2].ID, Following); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range want {
+		e, _ := s.EventBySlug(ctx, w, u1.ID)
+		if e.ViewerState != Following || e.Followers != 1 {
+			t.Fatalf("%s after follow: %+v", w, e)
+		}
+	}
+	if mine, _ := s.FollowedEvents(ctx, u1.ID, ""); len(mine) != 3 {
+		t.Fatalf("followed = %d, want 3", len(mine))
+	}
+	if solo, _ = s.EventBySlug(ctx, standaloneSlug, u1.ID); solo.Followers != 0 || solo.ViewerState != "" {
+		t.Fatalf("standalone touched by series follow: %+v", solo)
+	}
+	if o, _ := s.EventBySlug(ctx, otherSlug, u1.ID); o.Followers != 0 {
+		t.Fatalf("other series touched: %+v", o)
+	}
+
+	// Hiding one date hides the whole series for that viewer.
+	if err := s.SetEventFollow(ctx, u2.ID, members[0].ID, Hidden); err != nil {
+		t.Fatal(err)
+	}
+	feed, err := s.Feed(ctx, FeedOpts{From: time.Unix(0, 0), ViewerID: u2.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range feed {
+		if f.SeriesID == seriesID {
+			t.Fatalf("hidden series date still in feed: %s", f.Slug)
+		}
+	}
+	if hidden, _ := s.HiddenEvents(ctx, u2.ID); len(hidden) != 3 {
+		t.Fatalf("hidden = %d, want 3", len(hidden))
+	}
+	if err := s.ClearEventFollow(ctx, u2.ID, members[2].ID); err != nil {
+		t.Fatal(err)
+	}
+	if hidden, _ := s.HiddenEvents(ctx, u2.ID); len(hidden) != 0 {
+		t.Fatalf("hidden after clear = %d, want 0", len(hidden))
+	}
+
+	// Deleting one date leaves the others, which now count two.
+	if err := s.DeleteEvent(ctx, members[1].ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []string{want[0], want[2]} {
+		e, err := s.EventBySlug(ctx, w, 0)
+		if err != nil || e.SeriesID != seriesID || e.SeriesCount != 2 {
+			t.Fatalf("%s after delete: %v %+v", w, err, e)
+		}
+	}
+	if mine, _ := s.FollowedEvents(ctx, u1.ID, ""); len(mine) != 2 {
+		t.Fatalf("followed after delete = %d, want 2", len(mine))
+	}
+	// Following the standalone leaves the series untouched.
+	if err := s.SetEventFollow(ctx, u2.ID, solo.ID, Following); err != nil {
+		t.Fatal(err)
+	}
+	if mine, _ := s.FollowedEvents(ctx, u2.ID, ""); len(mine) != 1 || mine[0].ID != solo.ID {
+		t.Fatalf("standalone follow: %d rows", len(mine))
 	}
 }
 

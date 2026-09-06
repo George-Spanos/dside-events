@@ -210,6 +210,39 @@ func TestHome_MineColumn_ShowsFollowedUpcoming(t *testing.T) {
 	assertNotContains(t, r, f.Title)
 }
 
+// spec: Home, UpcomingAll.FilterableByTag, FollowEvent
+func TestHome_MineColumn_FollowsTagFilter(t *testing.T) {
+	concert := validEvent(t, tomorrow())
+	concert.Title = uniqTitle(t, "Mine concert")
+	film := validEvent(t, tomorrow())
+	film.Title, film.Tags = uniqTitle(t, "Mine film"), []string{"film"}
+	p := asPoster(t, poster1)
+	concertSlug, filmSlug := createEvent(t, p, concert), createEvent(t, p, film)
+	alice := newUser(t)
+	assertRedirect(t, setEventFollow(alice, concertSlug, "follow", "/"), "/")
+	assertRedirect(t, setEventFollow(alice, filmSlug, "follow", "/"), "/")
+
+	// Unfiltered: both followed events sit in Mine.
+	mine := section(alice.get("/").Body, "mine")
+	for _, slug := range []string{concertSlug, filmSlug} {
+		if rowFor(mine, slug) == "" {
+			t.Errorf("Mine column lacks /e/%s\nsection: %s", slug, snippet(mine))
+		}
+	}
+	// Filtered: the Mine column narrows to the tag like Upcoming does.
+	mine = section(alice.get("/?tag=film").Body, "mine")
+	if rowFor(mine, filmSlug) == "" {
+		t.Errorf("Mine column filtered by film lacks /e/%s\nsection: %s", filmSlug, snippet(mine))
+	}
+	if rowFor(mine, concertSlug) != "" {
+		t.Errorf("Mine column filtered by film still lists the concert /e/%s\nsection: %s", concertSlug, snippet(mine))
+	}
+	// A tag with nothing followed drops the column altogether.
+	r := alice.get("/?tag=exhibition")
+	assertStatus(t, r, 200)
+	assertNotContains(t, r, `<section class="mine">`)
+}
+
 // spec: Home, MyEvents, Event.is_upcoming, FollowEvent
 func TestHome_MineColumn_AbsentWhenOnlyPastFollowed(t *testing.T) {
 	past := validEvent(t, yesterday())

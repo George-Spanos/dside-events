@@ -133,6 +133,12 @@ type eventForm struct {
 	Title, Date, Time, Venue, Price, Description string
 	Tags                                         []string
 	LinkLabels, LinkURLs                         []string
+	// The repeat controls of /new (the edit form has none). Emitted only when
+	// set, so a single-event post is byte for byte what it always was.
+	Repeats  bool
+	Weekdays []string // mon..sun
+	Times    string   // "18:00, 21:00"; empty means Time alone
+	Until    string   // 2006-01-02
 }
 
 func (f eventForm) values() url.Values {
@@ -145,6 +151,18 @@ func (f eventForm) values() url.Values {
 	v.Set("description", f.Description)
 	for _, tg := range f.Tags {
 		v.Add("tag", tg)
+	}
+	if f.Repeats {
+		v.Set("repeats", "1")
+	}
+	for _, d := range f.Weekdays {
+		v.Add("weekday", d)
+	}
+	if f.Times != "" {
+		v.Set("times", f.Times)
+	}
+	if f.Until != "" {
+		v.Set("until", f.Until)
 	}
 	n := len(f.LinkLabels)
 	if len(f.LinkURLs) > n {
@@ -192,6 +210,57 @@ func createEvent(t testing.TB, c *client, f eventForm) string {
 		t.Fatalf("create %q: Location %q does not match /e/{slug}", f.Title, r.Location)
 	}
 	return m[1]
+}
+
+// ---- repeating events --------------------------------------------------------
+
+// weekdayValue is the weekday form value (mon..sun) of a 2006-01-02 date.
+func weekdayValue(date string) string {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		panic(err)
+	}
+	return strings.ToLower(d.Weekday().String()[:3])
+}
+
+// validSeries is a complete, valid weekly repeating event: tomorrow's weekday
+// only, from tomorrow until weeks-1 weeks later, so exactly weeks dates.
+func validSeries(t testing.TB, weeks int) eventForm {
+	t.Helper()
+	f := validEvent(t, tomorrow())
+	f.Title = uniqTitle(t, "Series")
+	f.Repeats = true
+	f.Weekdays = []string{weekdayValue(tomorrow())}
+	f.Until = daysFromNow(1 + 7*(weeks-1))
+	return f
+}
+
+// seriesSlugs returns, in list order, the slug of every /upcoming row titled
+// title: the dates of a repeating event as the feed shows them to c.
+func seriesSlugs(t testing.TB, c *client, title string) []string {
+	t.Helper()
+	r := c.get("/upcoming")
+	assertStatus(t, r, 200)
+	var out []string
+	for _, row := range eventRows(r.Body) {
+		if strings.Contains(row, ">"+title+"</a>") {
+			out = append(out, slugOf(row))
+		}
+	}
+	return out
+}
+
+// createSeries posts the repeating form f to /new as c. It returns the slug
+// the 303 points at and every date's slug in feed order, and asserts the
+// contract that the redirect names the earliest date.
+func createSeries(t testing.TB, c *client, f eventForm) (first string, all []string) {
+	t.Helper()
+	first = createEvent(t, c, f)
+	all = seriesSlugs(t, c, f.Title)
+	if len(all) == 0 || all[0] != first {
+		t.Fatalf("create series %q: 303 to /e/%s, but the /upcoming rows are %v (want the earliest date first)", f.Title, first, all)
+	}
+	return first, all
 }
 
 // ---- event follow ------------------------------------------------------------

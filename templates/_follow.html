@@ -5,6 +5,7 @@
   <button name="state" value="{{if eq .State "following"}}clear{{else}}follow{{end}}" aria-pressed="{{if eq .State "following"}}true{{else}}false{{end}}" data-on="Following" data-off="Follow">{{if eq .State "following"}}Following{{else}}Follow{{end}}</button>
   <button name="state" value="{{if eq .State "hidden"}}clear{{else}}hide{{end}}" aria-pressed="{{if eq .State "hidden"}}true{{else}}false{{end}}" data-on="Hidden" data-off="Hide">{{if eq .State "hidden"}}Hidden{{else}}Hide{{end}}</button>
   <span class="count">{{template "counter" .}}</span>
+  {{if gt .SeriesCount 1}}<br><small>Follow or hide applies to all {{.SeriesCount}} dates.</small>{{end}}
   {{if eq .State "hidden"}}<br><small>Hidden from your feed.</small>{{end}}
 </form>
 {{else}}

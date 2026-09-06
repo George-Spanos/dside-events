@@ -29,12 +29,28 @@
       .then(function (html) {
         if (!html) return;
         var doc = new DOMParser().parseFromString(html, 'text/html');
+        // Home: a press moves the event between Mine and Upcoming, so take
+        // both columns from the response instead of patching one form.
+        var columns = document.querySelector('.columns'), freshColumns = doc.querySelector('.columns');
+        if (columns && freshColumns) { columns.replaceWith(freshColumns); return; }
         var fresh = doc.querySelector('form[action="' + key + '"]');
-        if (fresh) { form.replaceWith(fresh); return; }
-        // No matching form in the new page: the event left this list (hidden,
-        // or unfollowed from Mine). Take the row with it; otherwise just unlock.
-        var row = form.closest('.events li');
-        if (row) row.remove(); else delete form.dataset.busy;
+        var row = form.closest('.events li'), series = row && row.dataset.series;
+        if (fresh) {
+          form.replaceWith(fresh);
+        } else {
+          // No matching form in the new page: the event left this list (hidden,
+          // or unfollowed from Mine). Take the row with it; otherwise just unlock.
+          if (row) row.remove(); else delete form.dataset.busy;
+        }
+        if (!series) return;
+        // Follow and hide apply to every date of a repeating event, so bring
+        // its other rows up to date from the same response.
+        document.querySelectorAll('.events li[data-series="' + series + '"]').forEach(function (li) {
+          if (li === row) return;
+          var f = li.querySelector('form[data-toggle]');
+          var nf = f && doc.querySelector('form[action="' + f.getAttribute('action') + '"]');
+          if (nf) f.replaceWith(nf); else li.remove();
+        });
       })
       .catch(function () { form.dataset.native = '1'; btn.click(); });
   });

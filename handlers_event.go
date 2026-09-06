@@ -2,21 +2,23 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"dside.studio/events/internal/store"
 )
 
 type eventFormPage struct {
 	Base
-	Edit   bool
-	Slug   string
-	Form   *eventForm
-	Tags   []string
-	Cancel string
+	Edit     bool
+	Slug     string
+	Form     *eventForm
+	Tags     []string
+	Weekdays []weekdayOption
+	Cancel   string
 }
 
 func (s *Server) formPage(r *http.Request, f *eventForm, e *store.Event) eventFormPage {
-	p := eventFormPage{Base: s.base(r), Form: f, Tags: tags, Cancel: "/"}
+	p := eventFormPage{Base: s.base(r), Form: f, Tags: tags, Weekdays: weekdays, Cancel: "/"}
 	if e != nil {
 		p.Edit, p.Slug, p.Cancel = true, e.Slug, "/e/"+e.Slug
 	}
@@ -45,16 +47,22 @@ func (s *Server) newSubmit(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	f, in := s.parseEventForm(r)
+	f, in, starts := s.parseEventForm(r, true)
 	if in == nil {
 		return s.render(w, r, http.StatusUnprocessableEntity, "eventform", s.formPage(r, f, nil))
 	}
-	if dup, err := s.checkDuplicate(r, f, acct.ID, in, 0); err != nil {
+	if dup, err := s.checkDuplicate(r, f, acct.ID, in.Title, starts, 0); err != nil {
 		return err
 	} else if dup {
 		return s.render(w, r, http.StatusUnprocessableEntity, "eventform", s.formPage(r, f, nil))
 	}
-	slug, err := s.store.CreateEvent(r.Context(), acct.ID, eventSlug(in.Title, in.StartsAt, s.loc), *in)
+	base := func(t time.Time) string { return eventSlug(in.Title, t, s.loc) }
+	var slug string
+	if len(starts) > 1 {
+		slug, err = s.store.CreateSeries(r.Context(), acct.ID, starts, base, *in)
+	} else {
+		slug, err = s.store.CreateEvent(r.Context(), acct.ID, base(in.StartsAt), *in)
+	}
 	if err != nil {
 		return err
 	}
@@ -90,11 +98,11 @@ func (s *Server) editSubmit(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	f, in := s.parseEventForm(r)
+	f, in, starts := s.parseEventForm(r, false)
 	if in == nil {
 		return s.render(w, r, http.StatusUnprocessableEntity, "eventform", s.formPage(r, f, e))
 	}
-	if dup, err := s.checkDuplicate(r, f, acct.ID, in, e.ID); err != nil {
+	if dup, err := s.checkDuplicate(r, f, acct.ID, in.Title, starts, e.ID); err != nil {
 		return err
 	} else if dup {
 		return s.render(w, r, http.StatusUnprocessableEntity, "eventform", s.formPage(r, f, e))

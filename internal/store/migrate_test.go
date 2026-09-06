@@ -8,7 +8,8 @@ import (
 )
 
 // A database created by the first production image (schema 1, table
-// interests) must come out of Open with follows_events and its rows converted.
+// interests) must come out of Open at the current version, with follows_events
+// and its rows converted and the legacy event standing alone (NULL series_id).
 func TestMigrateFromSchema1(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "old.db")
 	init1, err := migrations.ReadFile("migrations/001_init.sql")
@@ -56,8 +57,26 @@ func TestMigrateFromSchema1(t *testing.T) {
 	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('follows_tags', 'follows_posters')").Scan(&n); err != nil || n != 0 {
 		t.Fatalf("follows_tags/follows_posters tables still present (%d, %v)", n, err)
 	}
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'events_series'").Scan(&n); err != nil || n != 1 {
+		t.Fatalf("events_series index missing (%d, %v)", n, err)
+	}
+	var series sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, "SELECT series_id FROM events WHERE id = 1").Scan(&series); err != nil {
+		t.Fatal(err)
+	}
+	if series.Valid {
+		t.Fatalf("legacy event series_id = %d, want NULL", series.Int64)
+	}
+	// The scanner must read the NULL as a standalone event.
+	e, err := s.EventBySlug(ctx, "e-1", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.SeriesID != 0 || e.SeriesCount != 0 {
+		t.Fatalf("legacy event series: id=%d count=%d, want 0/0", e.SeriesID, e.SeriesCount)
+	}
 	var v int
-	if err := s.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_version").Scan(&v); err != nil || v != 3 {
-		t.Fatalf("schema_version = %d (%v), want 3", v, err)
+	if err := s.db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_version").Scan(&v); err != nil || v != 4 {
+		t.Fatalf("schema_version = %d (%v), want 4", v, err)
 	}
 }
