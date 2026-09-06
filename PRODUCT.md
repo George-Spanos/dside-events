@@ -52,7 +52,7 @@ Attendee accounts travel the same way. The account page shows a secret link (`/k
 - **Anonymous accounts only** for attendees. Curator accounts are created by hand and removed by hand; nothing promotes a user into a curator.
 - **Every form works with JavaScript disabled.** Success is a 303, validation failure a 422 carrying the submitted values, wrong role a 403. JavaScript only intercepts and swaps in the response, falling back to native submission on any error.
 - **Curator scale is open.** Vouched-for and hand-added, but the product must not assume the current two. Dozens is plausible. Whether curators ever need to be discoverable as a browsable list is **explicitly undecided** — do not build for it, do not design against it.
-- **Language: English interface, permanently.** Event content is whatever language the curator typed, usually Greek. There is no translation layer, no language switcher, and no per-event language field. Mixed Greek and English in a single list is the normal, expected state, and layouts must hold up under it.
+- **Language: English interface, permanently.** Event content is whatever language the curator typed, usually Greek. There is no translation layer, no language switcher, and no per-event language field. Mixed Greek and English in a single list is the normal, expected state, and layouts must hold up under it. The document declares `lang="en"` and keeps it; see the accepted 3.1.2 exception under Accessibility & Inclusion.
 
 ## Brand Commitments
 
@@ -85,4 +85,6 @@ Attendee accounts travel the same way. The account page shows a secret link (`/k
 
 The mechanisms already in place and expected to be preserved: state carried in semantics (`aria-pressed` on toggles, `aria-current` on navigation and filters, `aria-invalid` with `aria-describedby` on fields), a visible 2px focus ring on every focusable element, full `prefers-reduced-motion` support that disables transitions and view transitions alike, hover treatments confined to `@media (hover: hover)` so touch devices never inherit a stuck state, and a root font size of 106.25% so body text is readable on a phone without zooming.
 
-Note that no formal audit has been performed. AA is the stated requirement; conformance must not be claimed anywhere until someone verifies it.
+**One accepted exception, ruled by the founder on 2026-09-06.** The document declares `lang="en"` and keeps it. Curator-authored content is usually Greek and is not marked up as such, because there is no per-event language field and there will not be one. This is a known WCAG 3.1.2 (Language of Parts, AA) failure: a screen reader will read Greek titles with English phonetics. It is accepted rather than engineered around, and it is not an oversight to be "fixed" by a later pass — reopen it only if the founder says so.
+
+Note that no formal audit has been performed. AA is the stated requirement; conformance must not be claimed anywhere until someone verifies it, and any claim that is made has to carry the 3.1.2 exception above.
