@@ -20,7 +20,6 @@ type Server struct {
 	version string
 	pages   map[string]*template.Template
 	sw      *swTemplate
-	icons   map[string][]byte // "/icon-192.png" -> PNG bytes
 }
 
 func newServer(cfg Config, st *store.Store, loc *time.Location) (*Server, error) {

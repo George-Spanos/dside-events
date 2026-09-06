@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/png"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -22,7 +18,7 @@ type swTemplate struct {
 	tpl *texttemplate.Template
 }
 
-// initStatic parses the service worker template and draws the PNG icons.
+// initStatic parses the service worker template.
 func (s *Server) initStatic() error {
 	raw, err := fs.ReadFile(staticFS, "static/sw.js")
 	if err != nil {
@@ -33,31 +29,7 @@ func (s *Server) initStatic() error {
 		return fmt.Errorf("static/sw.js: %w", err)
 	}
 	s.sw = &swTemplate{tpl: tpl}
-	s.icons = map[string][]byte{}
-	for _, size := range []int{180, 192, 512} {
-		b, err := drawIcon(size)
-		if err != nil {
-			return err
-		}
-		s.icons[fmt.Sprintf("/icon-%d.png", size)] = b
-	}
 	return nil
-}
-
-// drawIcon renders the icon.svg design (64-unit ochre square, white bar at
-// y=40 h=5 x=12 w=40) as a PNG of the given size.
-func drawIcon(size int) ([]byte, error) {
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	ochre := color.RGBA{0x87, 0x58, 0x00, 0xff}
-	draw.Draw(img, img.Bounds(), image.NewUniform(ochre), image.Point{}, draw.Src)
-	scale := func(u int) int { return u * size / 64 }
-	bar := image.Rect(scale(12), scale(40), scale(52), scale(45))
-	draw.Draw(img, bar, image.NewUniform(color.White), image.Point{}, draw.Src)
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // static serves /static/* from the embedded FS with a long immutable cache
@@ -95,15 +67,11 @@ func (s *Server) iconSVG(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, staticFS, "static/icon.svg")
 }
 
+// iconPNG serves the pre-rendered app icons (static/icon-{180,192,512}.png).
 func (s *Server) iconPNG(w http.ResponseWriter, r *http.Request) {
-	b, ok := s.icons[r.URL.Path]
-	if !ok {
-		s.renderError(w, r, http.StatusNotFound)
-		return
-	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Write(b)
+	http.ServeFileFS(w, r, staticFS, "static"+r.URL.Path)
 }
 
 func (s *Server) offline(w http.ResponseWriter, r *http.Request) error {

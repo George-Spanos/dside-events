@@ -140,3 +140,7 @@ printed inside the curators' secret links.
   `/mine`, `/following` and `/account` show an empty state.
 - Times are stored as unix seconds (UTC) and shown in Europe/Athens.
 - Event URLs never change after publishing.
+
+## Credits
+
+The app icon is the `calendar-event` glyph from [Tabler Icons](https://tabler.io/icons) (MIT, © Paweł Kuna) on the site's ochre tile.
