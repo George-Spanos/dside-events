@@ -4,7 +4,7 @@
   --bg: #FCF8EF;
   --fg: #2E2823;
   --muted: #6C6157;
-  --link: #6E2A5F;
+  --link: #875800;
   --error: #B5261A;
   --rule: #E2D9C9;
   --measure: 68ch;
@@ -20,7 +20,7 @@
     --bg: #272320;
     --fg: #F1EADF;
     --muted: #B8AC9D;
-    --link: #D8A8CB;
+    --link: #E9B653;
     --error: #FF9585;
     --rule: #4B433B;
   }
@@ -29,7 +29,7 @@
   --bg: #272320;
   --fg: #F1EADF;
   --muted: #B8AC9D;
-  --link: #D8A8CB;
+  --link: #E9B653;
   --error: #FF9585;
   --rule: #4B433B;
 }
