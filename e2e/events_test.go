@@ -211,7 +211,7 @@ func TestEditEvent_OwnerEdits_SlugImmutable(t *testing.T) {
 	assertStatus(t, r, 200)
 	assertContains(t, r, `value="`+f.Title+`"`)
 	assertContains(t, r, `value="`+f.Venue+`"`)
-	assertContains(t, r, `value="`+f.Date+`"`)
+	assertContains(t, r, `value="`+formDate(f.Date)+`"`)
 	assertContains(t, r, `value="`+f.Time+`"`)
 	assertContains(t, r, f.Description)
 	assertContains(t, r, `value="`+f.LinkURLs[0]+`"`)

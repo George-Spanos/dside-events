@@ -296,7 +296,7 @@ func TestCreateSeries_ValidationErrors(t *testing.T) {
 				assertContains(t, r, `value="`+f.Times+`"`)
 			}
 			if f.Until != "" {
-				assertContains(t, r, `value="`+f.Until+`"`)
+				assertContains(t, r, `value="`+formDate(f.Until)+`"`)
 			}
 			// Nothing was created.
 			assertNotListed(t, anon(t), "/upcoming", f.Title)

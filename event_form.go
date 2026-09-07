@@ -20,6 +20,10 @@ const maxLinks = 3
 // max_series_occurrences).
 const maxSeriesDates = 200
 
+// formDate is the layout of every date the form shows and reads: the day
+// order people here write by hand.
+const formDate = "02/01/2006"
+
 // linkField is one label/url pair of the form.
 type linkField struct {
 	Label string
@@ -93,7 +97,7 @@ func (f *eventForm) finish() bool {
 // formFromEvent prefills the form from a stored event.
 func (s *Server) formFromEvent(e *store.Event) *eventForm {
 	start := e.StartsAt.In(s.loc)
-	f := &eventForm{Title: e.Title, Date: start.Format("2006-01-02"), Time: start.Format("15:04"),
+	f := &eventForm{Title: e.Title, Date: start.Format(formDate), Time: start.Format("15:04"),
 		Venue: e.Venue, Price: e.Price, Description: e.Description, Tags: e.Tags, TagSet: map[string]bool{}}
 	for _, t := range e.Tags {
 		f.TagSet[t] = true
@@ -162,9 +166,9 @@ func (s *Server) parseEventForm(r *http.Request, repeatable bool) (*eventForm, *
 	}
 	var starts []time.Time
 	if f.Date != "" && f.Time != "" {
-		start, err := time.ParseInLocation("2006-01-02 15:04", f.Date+" "+f.Time, s.loc)
+		start, err := time.ParseInLocation(formDate+" 15:04", f.Date+" "+f.Time, s.loc)
 		if err != nil {
-			if _, derr := time.Parse("2006-01-02", f.Date); derr != nil {
+			if _, derr := time.Parse(formDate, f.Date); derr != nil {
 				f.fail("date", "Pick a valid date.")
 			} else {
 				f.fail("time", "Pick a valid start time.")
@@ -263,7 +267,7 @@ func (s *Server) seriesStarts(f *eventForm, start time.Time) []time.Time {
 		}
 	}
 	first := s.midnight(start)
-	until, err := time.ParseInLocation("2006-01-02", f.Until, s.loc)
+	until, err := time.ParseInLocation(formDate, f.Until, s.loc)
 	switch {
 	case f.Until == "":
 		f.fail("until", "Pick an until date.")

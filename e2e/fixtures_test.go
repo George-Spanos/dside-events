@@ -48,6 +48,16 @@ func daysFromNow(n int) string {
 	return time.Now().In(athens).AddDate(0, 0, n).Format("2006-01-02")
 }
 
+// formDate renders an ISO date the way the form takes it, dd/mm/yyyy. A value
+// that is not an ISO date (a deliberately malformed one) passes through, so a
+// test can still post junk.
+func formDate(date string) string {
+	if d, err := time.Parse("2006-01-02", date); err == nil {
+		return d.Format("02/01/2006")
+	}
+	return date
+}
+
 func tomorrow() string  { return daysFromNow(1) }
 func yesterday() string { return daysFromNow(-1) }
 
@@ -144,7 +154,7 @@ type eventForm struct {
 func (f eventForm) values() url.Values {
 	v := url.Values{}
 	v.Set("title", f.Title)
-	v.Set("date", f.Date)
+	v.Set("date", formDate(f.Date))
 	v.Set("time", f.Time)
 	v.Set("venue", f.Venue)
 	v.Set("price", f.Price)
@@ -162,7 +172,7 @@ func (f eventForm) values() url.Values {
 		v.Set("times", f.Times)
 	}
 	if f.Until != "" {
-		v.Set("until", f.Until)
+		v.Set("until", formDate(f.Until))
 	}
 	n := len(f.LinkLabels)
 	if len(f.LinkURLs) > n {

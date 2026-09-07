@@ -11,7 +11,7 @@
   <div class="row">
     <div>
       <label for="date">Date</label>
-      <input id="date" name="date" type="date" required value="{{$f.Date}}"{{with index $f.Errors "date"}} aria-invalid="true" aria-describedby="date-err"{{end}}>
+      <input id="date" name="date" type="text" inputmode="numeric" autocomplete="off" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" placeholder="dd/mm/yyyy" required value="{{$f.Date}}"{{with index $f.Errors "date"}} aria-invalid="true" aria-describedby="date-err"{{end}}>
       {{with index $f.Errors "date"}}<p class="error" id="date-err">{{.}}</p>{{end}}
     </div>
     <div>
@@ -39,7 +39,7 @@
         </div>
         <div>
           <label for="until">Until</label>
-          <input id="until" name="until" type="date" value="{{$f.Until}}"{{with index $f.Errors "until"}} aria-invalid="true" aria-describedby="until-err"{{end}}>
+          <input id="until" name="until" type="text" inputmode="numeric" autocomplete="off" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" placeholder="dd/mm/yyyy" value="{{$f.Until}}"{{with index $f.Errors "until"}} aria-invalid="true" aria-describedby="until-err"{{end}}>
           {{with index $f.Errors "until"}}<p class="error" id="until-err">{{.}}</p>{{end}}
         </div>
       </div>

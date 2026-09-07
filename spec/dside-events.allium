@@ -299,8 +299,8 @@ rule CreateEvent {
     @guidance
         -- HTTP: GET/POST /new for posters only; a user or an anonymous visitor
         -- gets 403. Form fields title, date, time, venue, price, tag
-        -- (repeated), link_label_1..3, link_url_1..3, description; date and
-        -- time are read in Europe/Athens. A link without label defaults its
+        -- (repeated), link_label_1..3, link_url_1..3, description; date is
+        -- dd/mm/yyyy and, with time, read in Europe/Athens. A link without label defaults its
         -- label to the URL host. Success 303 to /e/{slug}; any failed
         -- requirement 422 re-rendering the form with the submitted values, the
         -- duplicate case saying "already posted".
@@ -356,7 +356,7 @@ rule CreateSeries {
         -- HTTP: POST /new with the CreateEvent fields plus repeats=1, weekday
         -- (repeated checkbox; mon tue wed thu fri sat sun), times (optional
         -- text, comma-separated HH:MM; empty means the time field alone) and
-        -- until (YYYY-MM-DD). date is first_date and time stays required. The
+        -- until (dd/mm/yyyy). date is first_date and time stays required. The
         -- edit form never offers or reads these fields. Every date is inserted
         -- in one transaction; success 303 to /e/{slug} of the earliest date.
         -- Any failed requirement 422 re-rendering the form with the submitted

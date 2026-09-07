@@ -107,9 +107,12 @@ form. Day headings are `<h3 class="day">{Today · |Tomorrow · }<b>Weekday</b>
 Event form fields: `title`, `date`, `time`, `venue`, `price`, `tag` (repeated),
 `link_label_1..3`, `link_url_1..3`, `description`; on `/new` only, the repeat
 controls `repeats` (`1`), `weekday` (repeated, `mon`..`sun`), `times`
-(optional, comma-separated `HH:MM`) and `until` (`YYYY-MM-DD`), which the
-`eventForm` fixture emits only when set. There is no fourth link
-field, so `max_links` (3) is checked as "the form offers exactly three slots"
+(optional, comma-separated `HH:MM`) and `until` (`dd/mm/yyyy`), which the
+`eventForm` fixture emits only when set. `Date` and `Until` are held as
+`YYYY-MM-DD` in the fixture and rendered as `dd/mm/yyyy` by `formDate` when
+posted, so a fixture date still reads like the slug it produces. There is no
+fourth link field, so `max_links` (3) is checked as "the form offers exactly
+three slots"
 rather than by posting a `link_url_4` the contract does not define. Slugs match
 `^[a-z0-9-]+-\d{4}-\d{2}-\d{2}(-\d+)?$`; Greek titles are transliterated
 ("Ταξίδι στη Χώρα των Ήχων" → `taxidi-sti-chora-ton-ichon-…`).

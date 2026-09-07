@@ -36,7 +36,7 @@ func TestParseEventForm_MaxThreeLinks(t *testing.T) {
 	}
 	s := &Server{loc: athens(t)}
 	v := url.Values{
-		"title": {"Concert"}, "date": {time.Now().AddDate(0, 0, 7).Format("2006-01-02")}, "time": {"21:00"},
+		"title": {"Concert"}, "date": {time.Now().AddDate(0, 0, 7).Format(formDate)}, "time": {"21:00"},
 		"venue": {"Gagarin"}, "tag": {"concert"},
 		"link_label_1": {"One"}, "link_url_1": {"https://one.example/"},
 		"link_label_2": {"Two"}, "link_url_2": {"https://two.example/"},
@@ -143,10 +143,10 @@ func TestParseEventForm_Repeats(t *testing.T) {
 	first := now.AddDate(0, 0, 7)
 	valid := func() url.Values {
 		return url.Values{
-			"title": {"Film"}, "date": {first.Format("2006-01-02")}, "time": {"18:00"},
+			"title": {"Film"}, "date": {first.Format(formDate)}, "time": {"18:00"},
 			"venue": {"Cinema"}, "tag": {"concert"},
 			"repeats": {"1"}, "weekday": {"mon", "wed"}, "times": {"21:00, 18:00"},
-			"until": {first.AddDate(0, 0, 13).Format("2006-01-02")},
+			"until": {first.AddDate(0, 0, 13).Format(formDate)},
 		}
 	}
 
@@ -189,15 +189,15 @@ func TestParseEventForm_Repeats(t *testing.T) {
 		{"same times", func(v url.Values) { v.Set("times", "18:00, 21:00, 18:00") }, "times", "Each start time must be different."},
 		{"until empty", func(v url.Values) { v.Set("until", "") }, "until", "Pick an until date."},
 		{"until invalid", func(v url.Values) { v.Set("until", "soon") }, "until", "Pick a valid until date."},
-		{"until before date", func(v url.Values) { v.Set("until", first.AddDate(0, 0, -1).Format("2006-01-02")) }, "until", "Until must be on or after the date."},
-		{"until too far", func(v url.Values) { v.Set("until", now.AddDate(3, 0, 7).Format("2006-01-02")) }, "until", "Until must be within the next three years."},
+		{"until before date", func(v url.Values) { v.Set("until", first.AddDate(0, 0, -1).Format(formDate)) }, "until", "Until must be on or after the date."},
+		{"until too far", func(v url.Values) { v.Set("until", now.AddDate(3, 0, 7).Format(formDate)) }, "until", "Until must be within the next three years."},
 		{"too few", func(v url.Values) {
-			v.Set("until", first.Format("2006-01-02"))
+			v.Set("until", first.Format(formDate))
 			v.Set("times", "")
 			v["weekday"] = []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 		}, "until", "A repeating event needs at least two dates."},
 		{"cap", func(v url.Values) {
-			v.Set("until", first.AddDate(0, 0, 70).Format("2006-01-02"))
+			v.Set("until", first.AddDate(0, 0, 70).Format(formDate))
 			v.Set("times", "10:00, 14:00, 18:00")
 			v["weekday"] = []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
 		}, "until", "A repeating event can have at most 200 dates."},

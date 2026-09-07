@@ -27,11 +27,21 @@ trap 'rm -f "$jar" "$body"' EXIT
 code=$(curl -sS -o /dev/null -w '%{http_code}' -c "$jar" "$link")
 [ "$code" = 303 ] || { echo "login failed ($code): check the secret link" >&2; exit 1; }
 
+# form_date turns a TSV date (YYYY-MM-DD, sortable in the file) into the
+# dd/mm/yyyy the form takes. Anything else is posted as written, so a bad
+# date is still reported by the form.
+form_date() {
+  case $1 in
+    ????-??-??) printf '%s/%s/%s' "${1:8:2}" "${1:5:2}" "${1:0:4}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 created=0 skipped=0 failed=0
 # Tabs are IFS whitespace and would swallow empty fields, so split on \x1f instead.
 while IFS=$'\x1f' read -r title date time venue price tags desc l1 u1 l2 u2 l3 u3 until days; do
   [ -n "$title" ] || continue
-  args=(--data-urlencode "title=$title" --data-urlencode "date=$date" --data-urlencode "time=$time"
+  args=(--data-urlencode "title=$title" --data-urlencode "date=$(form_date "$date")" --data-urlencode "time=$time"
         --data-urlencode "venue=$venue" --data-urlencode "price=$price" --data-urlencode "description=$desc"
         --data-urlencode "link_label_1=$l1" --data-urlencode "link_url_1=$u1"
         --data-urlencode "link_label_2=$l2" --data-urlencode "link_url_2=$u2"
@@ -39,7 +49,7 @@ while IFS=$'\x1f' read -r title date time venue price tags desc l1 u1 l2 u2 l3 u
   IFS=, read -ra taglist <<< "$tags"
   for t in "${taglist[@]}"; do args+=(--data-urlencode "tag=$t"); done
   if [ -n "$until" ]; then
-    args+=(--data-urlencode repeats=1 --data-urlencode "until=$until" --data-urlencode "times=$time")
+    args+=(--data-urlencode repeats=1 --data-urlencode "until=$(form_date "$until")" --data-urlencode "times=$time")
     IFS=, read -ra daylist <<< "${days:-mon,tue,wed,thu,fri,sat,sun}"
     for d in "${daylist[@]}"; do args+=(--data-urlencode "weekday=$d"); done
   fi
