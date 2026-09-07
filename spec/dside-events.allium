@@ -811,6 +811,13 @@ surface EventDetail {
         -- URL, served as text/calendar to anyone, session or not. It states
         -- no end time, because an event here has no end time. A past event
         -- does not offer it; an unknown slug 404s like the page.
+        -- Beside it, separated by a middle dot, sits Share: a link-styled
+        -- button that copies this date's own absolute URL (not the series
+        -- canonical one) to the clipboard, its label becoming "Copied" for
+        -- two seconds, or "Copy failed" if the write is refused. It is the
+        -- one control on the site with no form behind it, so it is rendered
+        -- hidden and revealed only by script that finds a clipboard; where
+        -- there is none, the address bar is the URL.
 
 }
 

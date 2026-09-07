@@ -305,6 +305,10 @@ type eventPage struct {
 	Event   eventView
 	Follow  FollowView
 	CanEdit bool
+	// ShareURL is this page's own absolute URL, the one Share copies. It is
+	// not the canonical URL: a date of a series hands its ranking claim to
+	// another date, but a visitor shares the evening they are looking at.
+	ShareURL string
 }
 
 func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
@@ -326,7 +330,8 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) error {
 		Event: view,
 		Follow: FollowView{Action: "/e/" + e.Slug + "/follow", Back: "/e/" + e.Slug, State: e.ViewerState,
 			Count: e.Followers, Past: past, SeriesCount: e.SeriesCount},
-		CanEdit: acct != nil && acct.ID == e.PosterID,
+		CanEdit:  acct != nil && acct.ID == e.PosterID,
+		ShareURL: s.abs("/e/" + e.Slug),
 	}
 	return s.render(w, r, http.StatusOK, "event", page)
 }

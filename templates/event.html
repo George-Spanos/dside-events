@@ -9,7 +9,10 @@
 </p>
 {{if .Event.Past}}<p class="muted">This event has passed.</p>{{end}}
 {{template "eventfollow" .Follow}}
-{{if not .Event.Past}}<p><a href="/e/{{.Event.Slug}}/calendar.ics">Add to calendar</a></p>{{end}}
+{{/* The quiet line: two ways to take the event with you, under the decision
+     itself. Share stays hidden until app.js finds a clipboard to write to —
+     copying a link is the one control here with no form behind it. */}}
+{{if not .Event.Past}}<p><a href="/e/{{.Event.Slug}}/calendar.ics">Add to calendar</a><span data-share hidden> · <button type="button" class="linklike" aria-live="polite" data-copy="{{.ShareURL}}" data-done="Copied" data-failed="Copy failed">Share</button></span></p>{{end}}
 {{with .Event.Links}}<ul class="links">{{range .}}<li><a href="{{.URL}}" rel="noopener">{{.Label}}<span aria-hidden="true"> ↗</span></a></li>{{end}}</ul>{{end}}
 {{with paragraphs .Event.Description}}<div class="desc">{{range .}}<p>{{.}}</p>{{end}}</div>{{end}}
 <hr>

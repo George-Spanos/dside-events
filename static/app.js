@@ -71,6 +71,28 @@
   });
 
 
+  // Share: copies the event's own URL. This is the one control on the site
+  // with no form behind it — a clipboard write has no HTML equivalent — so
+  // the server renders it hidden and it appears only where a clipboard is
+  // actually there to write to. Where it is not, the URL is still in the
+  // address bar, which is all the button was ever going to hand over.
+  var share = document.querySelector('button[data-copy]');
+  if (share && navigator.clipboard && navigator.clipboard.writeText) {
+    share.parentNode.hidden = false;
+    var idle = share.textContent, back;
+    share.addEventListener('click', function () {
+      navigator.clipboard.writeText(share.dataset.copy).then(function () {
+        share.textContent = share.dataset.done;
+      }, function () {
+        share.textContent = share.dataset.failed;
+      }).then(function () {
+        // The label names the action again once the answer has been read.
+        clearTimeout(back);
+        back = setTimeout(function () { share.textContent = idle; }, 2000);
+      });
+    });
+  }
+
   // Theme toggle: the server cannot see the system setting, so when no choice
   // is stored it offers "dark"; flip the offer if the system is already dark.
   var t = document.querySelector('form.theme button[name="theme"]');

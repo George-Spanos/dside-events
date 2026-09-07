@@ -238,7 +238,7 @@ The Follow control is the system's one piece of real interaction design and it i
 - **Two sizes, one control.** On the event page the toggle is the page's decision and runs at body size behind that 8.5em reservation. In a programme row it is a mark in the margin, not the headline of the line: Meta size, `0.25rem 0.6rem` padding, and the reservation comes down with the type to `7.25em` — still wide enough to hold "✓ Following" without reflowing. The smaller footprint is what lets the toggle ride the title line inside a home column instead of dropping under the row's meta lines
 - A `::before` check-mark slot exists in both states at zero width and zero opacity, expanding to `1.15em` when pressed. The mark appears *with* the colour fill, as one gesture, and the content is `"✓" / ""` so screen readers get the empty alternative rather than a spoken glyph — `aria-pressed` already carries the state
 - Font weight is explicitly held constant (`font-weight: inherit`) across states. Colour changes; geometry does not
-- Hide sits beneath Follow as a `.linklike` button — a real `<button>` styled as an underlined Burnt Ochre link, so a destructive-feeling action never looks like a primary control
+- Hide sits beneath Follow as a `.linklike` button — a real `<button>` styled as an underlined Burnt Ochre link, so a destructive-feeling action never looks like a primary control. `.linklike` takes the link underline whole, tint included (55% Burnt Ochre at rest, full on hover): one of these sits beside a real link on the event page — *Add to calendar · Share* — and two controls of equal standing must not underline at different strengths
 
 ### Inputs / Fields
 
@@ -259,6 +259,8 @@ The Follow control is the system's one piece of real interaction design and it i
 ### Named Rules
 
 **The Working Form Rule.** Every interactive control in this system is a real HTML form that works with JavaScript disabled. `app.js` only intercepts, swaps the response in, and re-enables the native submit on any failure. A control that cannot be expressed as a form does not belong here.
+
+One control is exempt, and the exemption is the shape any future one must take. Share, on the event page, copies the URL to the clipboard — a capability with no HTML equivalent at all. It is therefore rendered `hidden` by the server and revealed only by script that has found a clipboard to write to, so a visitor without one is never shown a control that cannot act. What it would have handed over — the URL — is in the address bar either way. A control that cannot be a form ships hidden or it does not ship.
 
 ## Do's and Don'ts
 

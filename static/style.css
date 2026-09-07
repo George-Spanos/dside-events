@@ -209,8 +209,12 @@ a { text-underline-offset: .18em; text-decoration-color: color-mix(in srgb, var(
 button { border-radius: 4px; padding: .3rem .85rem; }
 button[aria-pressed="true"] { background: var(--link); border-color: var(--link); color: var(--bg); }
 
-/* Theme switch: buttons that read as links, the chosen one bold. */
-.linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; text-underline-offset: .18em; font: inherit; cursor: pointer; }
+/* Theme switch, Hide, Share: buttons that read as links, the chosen one bold.
+   They take the link underline whole, tint included — a control that reads as
+   a link beside a real one (Add to calendar · Share) must not underline
+   darker than it, and the hover that brings the tint to full is written for
+   both. */
+.linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--link) 55%, transparent); text-underline-offset: .18em; font: inherit; cursor: pointer; }
 .theme { display: inline; }
 
 /* Motion. Basis: Devouring Details (Rauno Freiberg): one curve, three durations; motion only
