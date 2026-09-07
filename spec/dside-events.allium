@@ -805,6 +805,12 @@ surface EventDetail {
         -- The owner sees an Edit link and a Delete form. Toggles are plain
         -- forms that work without script; script only replaces the form in
         -- place. Tags link to /?tag=, external links open the given URLs.
+        -- An upcoming event offers "Add to calendar", a plain link to
+        -- GET /e/{slug}/calendar.ics: one VEVENT (RFC 5545) carrying the
+        -- title, the start in UTC, the venue, the description and the event
+        -- URL, served as text/calendar to anyone, session or not. It states
+        -- no end time, because an event here has no end time. A past event
+        -- does not offer it; an unknown slug 404s like the page.
 
 }
 

@@ -44,6 +44,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /upcoming", h(s.upcoming))
 	mux.HandleFunc("GET /mine", h(s.mine))
 	mux.HandleFunc("GET /e/{slug}", h(s.event))
+	mux.HandleFunc("GET /e/{slug}/calendar.ics", h(s.eventICS))
 	mux.HandleFunc("GET /e/{slug}/edit", h(s.editForm))
 	mux.HandleFunc("POST /e/{slug}/edit", h(s.editSubmit))
 	mux.HandleFunc("POST /e/{slug}/delete", h(s.deleteEvent))

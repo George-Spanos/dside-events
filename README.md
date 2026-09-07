@@ -27,6 +27,7 @@ logs to stderr.
 | `/upcoming`, `/upcoming?tag=x` | all upcoming events, day-grouped |
 | `/mine` | My feed: your Upcoming, Past and Hidden events |
 | `/e/{slug}` | one event; Follow / Hide, and how many follow it |
+| `/e/{slug}/calendar.ics` | the same event as a calendar file (RFC 5545), for Google Calendar and the rest |
 | `/p/{slug}` | a curator's events |
 | `/account` | your secret link, forget / delete |
 | `/robots.txt` | crawl rules; everything but `/k/` is open, and it names the sitemap |
