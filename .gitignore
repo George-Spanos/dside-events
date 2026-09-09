@@ -10,6 +10,9 @@ bin/
 curators.txt
 backups/
 
+# raw more.com drafts written by make fetch; the curated file is seed/*.tsv
+seed/drafts/
+
 # design tooling: the shared config and the design system are committed, the
 # per-machine overrides and the hook's cache are not
 .impeccable/config.local.json

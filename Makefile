@@ -22,7 +22,10 @@ NAME =
 SLUG =
 CURATOR ?= george-spanos
 
-.PHONY: help build run curator curator-links test e2e check fmt vet docker-up docker-down docker-curator docker-curator-links prod-up prod-curator prod-curator-links prod-seed reset-events prod-reset-events prod-backup prod-restore clean
+# The public instance, for the duplicate check of make seed-check.
+PROD_URL ?= https://events.dside.studio
+
+.PHONY: help build run curator curator-links fetch seed-check seed test e2e check fmt vet docker-up docker-down docker-curator docker-curator-links prod-up prod-curator prod-curator-links prod-seed reset-events prod-reset-events prod-backup prod-restore clean
 
 help: ## show this list
 	@grep -E '^[a-z0-9-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-21s %s\n", $$1, $$2}'
@@ -40,6 +43,22 @@ curator: build ## make a curator, prints their secret link: make curator NAME="M
 
 curator-links: build ## list every curator with their secret link (rotate one with: $(BIN) poster-link -slug x)
 	DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) poster-links
+
+fetch: ## draft a seed TSV from more.com into seed/drafts/: make fetch CATEGORY=theater|music|cinema FROM=2026-09-10 TO=2026-10-31 [ARGS="--venue Κήπος"]
+	@test -n "$(CATEGORY)" -a -n "$(FROM)" -a -n "$(TO)" || { echo 'usage: make fetch CATEGORY=theater|music|cinema FROM=YYYY-MM-DD TO=YYYY-MM-DD [ARGS="--min-popularity 10"]'; exit 2; }
+	@mkdir -p seed/drafts
+	python3 seed/fetch.py $(CATEGORY) --from $(FROM) --to $(TO) $(ARGS) > seed/drafts/$(CATEGORY)-$(FROM)-$(TO).tsv
+	@echo "wrote seed/drafts/$(CATEGORY)-$(FROM)-$(TO).tsv"
+
+seed-check: ## validate a seed file: form rules, live links, titles already on production: make seed-check FILE=seed/x.tsv
+	@test -f "$(FILE)" || { echo 'usage: make seed-check FILE=seed/<events>.tsv'; exit 2; }
+	python3 seed/check.py "$(FILE)" --urls --against $(PROD_URL)
+
+seed: build ## publish a seed file on the local dev server (make run first) as CURATOR: make seed FILE=seed/x.tsv [CURATOR=george-spanos]
+	@test -f "$(FILE)" || { echo 'usage: make seed FILE=seed/<events>.tsv [CURATOR=slug]'; exit 2; }
+	@link=$$(DB_PATH=$(DB_PATH) BASE_URL=$(BASE_URL) $(BIN) poster-links | awk -v p="poster $(CURATOR)" 'index($$0, p" ")==1 || $$0==p {getline; print $$2}' | grep '^http' | tail -1); \
+	test -n "$$link" || { echo "no local curator $(CURATOR); make one: make curator NAME=\"...\" SLUG=$(CURATOR)"; exit 2; }; \
+	seed/seed.sh "$$link" "$(FILE)"
 
 test: ## unit tests (store, slug)
 	go test . ./internal/...

@@ -126,6 +126,30 @@ cannot end up naming a curator in production. Pass them on the command line.
 The service has `restart: always`, so
 Watchtower pulls the new image and restarts the container on its own.
 
+## Finding events
+
+The seed files are written from real listings, and the finding is automated
+up to the point where taste is needed:
+
+    make fetch CATEGORY=theater FROM=2026-09-10 TO=2026-10-31   # -> seed/drafts/theater-....tsv
+    make seed-check FILE=seed/theater-athens-2026-10.tsv        # rules, links, duplicates on prod
+    make seed FILE=seed/theater-athens-2026-10.tsv              # publish on the local server
+    make prod-seed FILE=seed/theater-athens-2026-10.tsv         # publish on production
+
+`seed/fetch.py` (standard-library Python) reads more.com, which marks every
+concert, play and screening up with schema.org data, keeps the Attica ones in
+the window, opens each event page for its dates, venues and prices, and
+writes a draft in the seed TSV format: Greek blurb, promoter's title, one row
+per venue and time slot, weekly runs collapsed to `until`/`weekdays`. A `#`
+line above each event carries popularity, date count and sold-out count for
+curation; `--json` dumps everything. The draft is not for publishing: someone
+picks what belongs, rewrites the description in the house style and adds a
+second link. The Claude Code skill `.claude/skills/find-events/SKILL.md`
+does that whole loop (fetch, curate, research, write, check) and stops before
+`make prod-seed` unless told to publish. `seed/check.py` applies the form's
+rules to a file, GETs every link and warns about titles already on
+production, so a bad row fails before publishing rather than half-way through.
+
 Republishing the seed files after correcting them:
 
     make prod-reset-events                    # backs up first, then empties the events
