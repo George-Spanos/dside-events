@@ -38,5 +38,5 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: ghcr.io/george-spanos/dside-events:${{ github.sha }},ghcr.io/george-spanos/dside-events:latest
+          tags: ghcr.io/george-spanos/dside-events:${{ github.sha }},ghcr.io/george-spanos/dside-events:latest,ghcr.io/george-spanos/dside-events:stable
           context: .
