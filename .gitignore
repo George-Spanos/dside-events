@@ -20,3 +20,9 @@ seed/drafts/
 
 # worktrees created by tooling
 .claude/worktrees/
+
+# venue-watch helper deps (puppeteer-core)
+seed/node_modules/
+node_modules/
+seed/.snfcc-watch-state
+seed/snfcc-watch-report.txt
