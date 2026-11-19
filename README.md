@@ -150,6 +150,23 @@ does that whole loop (fetch, curate, research, write, check) and stops before
 rules to a file, GETs every link and warns about titles already on
 production, so a bad row fails before publishing rather than half-way through.
 
+### Venue watch
+
+The venues we follow closely (Theatre of NO, Half Note, Spiti Art Bar) are
+checked weekly by a systemd user timer on minisrv:
+
+    seed/check-venues.py                      # or: systemctl --user start dside-venue-watch.service
+    cat seed/venue-watch-report.txt           # the last report
+
+It runs `seed/fetch.py --json --venue <name>` per venue for the next 10
+weeks, compares the titles against what is live on production plus every
+committed `seed/*.tsv`, and writes `seed/venue-watch-report.txt`. Exit 1
+means there is something new to curate; feed the report to the find-events
+skill to do the rest. Edit `VENUES` in the script to follow more venues.
+The units live in `~/.config/systemd/user/dside-venue-watch.{service,timer}`
+(Monday 09:00 Athens time); linger is on for gspanos, so the timer runs
+without a login.
+
 Republishing the seed files after correcting them:
 
     make prod-reset-events                    # backs up first, then empties the events
