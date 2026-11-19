@@ -152,25 +152,20 @@ production, so a bad row fails before publishing rather than half-way through.
 
 ### Venue watch
 
-The venues we follow closely are checked weekly by a systemd user timer on
-minisrv: Theatre of NO, Half Note and Spiti Art Bar on more.com
-(`seed/check-venues.py`), and the Stavros Niarchos Foundation Cultural
-Center on its own WordPress API (`seed/check-snfcc.js`, which needs a real
-browser because Akamai blocks plain HTTP clients).
+The venues we follow closely (Theatre of NO, Half Note, Spiti Art Bar) are
+checked weekly by a systemd user timer on minisrv:
 
     seed/check-venues.py                      # or: systemctl --user start dside-venue-watch.service
-    cat seed/venue-watch-report.txt           # the last more.com report
-    cat seed/snfcc-watch-report.txt           # the last SNFCC report
+    cat seed/venue-watch-report.txt           # the last report
 
-Each script compares event titles against what is live on production plus
-every committed `seed/*.tsv` and exits 1 when something new turned up; the
-reports land in `seed/*-watch-report.txt`. Feed a report to the find-events
-skill to do the rest. `check-snfcc.js` needs `seed/node_modules`
-(`bun add puppeteer-core @puppeteer/browsers`) and the Chrome for Testing
-binary under `~/.omp/puppeteer`. Edit `VENUES` in `check-venues.py` to
-follow more more.com venues. The units live in
-`~/.config/systemd/user/dside-venue-watch.{service,timer}` (Monday 09:00
-Athens time); linger is on for gspanos, so the timer runs without a login.
+It runs `seed/fetch.py --json --venue <name>` per venue for the next 10
+weeks, compares the titles against what is live on production plus every
+committed `seed/*.tsv`, and writes `seed/venue-watch-report.txt`. Exit 1
+means there is something new to curate; feed the report to the find-events
+skill to do the rest. Edit `VENUES` in the script to follow more venues.
+The units live in `~/.config/systemd/user/dside-venue-watch.{service,timer}`
+(Monday 09:00 Athens time); linger is on for gspanos, so the timer runs
+without a login.
 
 Republishing the seed files after correcting them:
 
